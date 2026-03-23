@@ -1,0 +1,39 @@
+[   12593ms] [ERROR] In HTML, %s cannot be a descendant of <%s>.
+This will cause a hydration error.%s <li> li 
+
+  ...
+    <SegmentViewNode type="layout" pagePath="(admin)/la...">
+      <SegmentTrieNode>
+      <script>
+      <script>
+      <script>
+      <AdminLayout>
+        <SidebarProvider>
+          <div data-slot="sidebar-wr..." style={{...}} className="group/side...">
+            <AppSidebar>
+            <SidebarInset>
+              <main data-slot="sidebar-inset" className="relative f...">
+                <SiteHeader>
+                  <header className="flex h-16 ...">
+                    <SidebarTrigger>
+                    <Separator>
+                    <Breadcrumb className="min-w-0">
+                      <nav aria-label="breadcrumb" data-slot="breadcrumb" className="min-w-0">
+                        <BreadcrumbList className="flex-nowrap">
+                          <ol data-slot="breadcrumb..." className="flex items...">
+                            <BreadcrumbItem>
+                            <BreadcrumbItem className="shrink-0">
+>                             <li data-slot="breadcrumb-item" className="inline-flex items-center gap-1 shrink-0">
+                                <BreadcrumbSeparator>
+>                                 <li
+>                                   data-slot="breadcrumb-separator"
+>                                   role="presentation"
+>                                   aria-hidden="true"
+>                                   className={"[&>svg]:size-3.5"}
+>                                 >
+                                ...
+                ...
+ @ http://localhost:3001/_next/static/chunks/node_modules_next_dist_f3530cac._.js:3127
+[   12594ms] [ERROR] <%s> cannot contain a nested %s.
+See this log for the ancestor stack trace. li <li> @ http://localhost:3001/_next/static/chunks/node_modules_next_dist_f3530cac._.js:3127
+[   13866ms] [WARNING] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior @ http://localhost:3001/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297

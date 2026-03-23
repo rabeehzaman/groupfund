@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum FundType {
+  FIXED
+  OPEN
+}
+
+model Fund {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  type        FundType @default(FIXED)
+  amount      Float? // per-member target; required for FIXED, null for OPEN
+  goalAmount  Float? // optional total fundraising goal for OPEN funds
+  description String   @default("")
+  purpose     String   @default("") // what the collected fund will be used for
+  isRecurring Boolean  @default(true) // true = monthly, false = one-time
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false) // marks the auto-created monthly fund
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  receipts Receipt[]
+}
+
+model Member {
+  id            String    @id @default(cuid())
+  name          String
+  branch        String    @default("")
+  monthlyAmount Float     @default(1000)
+  joinDate      DateTime  @default(now())
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  receipts Receipt[]
+
+  @@unique([name, branch])
+}
+
+model Receipt {
+  id        String   @id @default(cuid())
+  date      DateTime
+  amount    Float
+  forMonth  String // "YYYY-MM" format
+  narration String   @default("")
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  fundId    String
+  fund      Fund     @relation(fields: [fundId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([memberId])
+  @@index([forMonth])
+  @@index([date])
+  @@index([fundId])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  date      DateTime
+  amount    Float
+  purpose   String
+  paidTo    String
+  narration String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+}
+
+model Settings {
+  id                   String   @id @default("default")
+  groupName            String   @default("Group Fund")
+  defaultMonthlyAmount Float    @default(1000)
+  financialYearStart   Int      @default(7) // month number (7=July)
+  updatedAt            DateTime @updatedAt
+}

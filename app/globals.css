@@ -124,6 +124,13 @@
     @apply bg-background text-foreground;
     }
   html {
-    @apply font-sans;
+    @apply font-sans scroll-smooth;
     }
+}
+
+/* Smooth transitions for interactive elements */
+@layer utilities {
+  .transition-card {
+    @apply transition-shadow duration-200 ease-in-out;
+  }
 }
