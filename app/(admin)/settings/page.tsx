@@ -1,5 +1,5 @@
 import { getSettings } from "@/lib/actions/settings"
-import { SettingsForm, ThemeToggle } from "./settings-form"
+import { SettingsForm } from "./settings-form"
 
 export default async function SettingsPage() {
   const settings = await getSettings()
@@ -12,7 +12,6 @@ export default async function SettingsPage() {
           Configure group fund settings.
         </p>
       </div>
-      <ThemeToggle />
       <SettingsForm settings={settings} />
     </div>
   )

@@ -3,6 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
+import { Moon, Sun } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
   SidebarTrigger,
@@ -18,6 +21,11 @@ import {
 
 type Crumb = { label: string; href?: string }
 
+type User = {
+  name: string
+  role: string
+}
+
 function getBreadcrumbs(pathname: string): Crumb[] {
   const map: Record<string, Crumb[]> = {
     "/dashboard": [{ label: "Dashboard" }],
@@ -32,6 +40,8 @@ function getBreadcrumbs(pathname: string): Crumb[] {
     "/funds/new": [{ label: "Funds", href: "/funds" }, { label: "Create Fund" }],
     "/reports": [{ label: "Reports" }],
     "/settings": [{ label: "Settings" }],
+    "/defaulters": [{ label: "Defaulters" }],
+    "/reminders": [{ label: "Reminders" }],
   }
 
   if (map[pathname]) return map[pathname]
@@ -45,12 +55,18 @@ function getBreadcrumbs(pathname: string): Crumb[] {
     return [{ label: "Payments", href: "/payments" }, { label: "Edit Payment" }]
   if (pathname.includes("/funds/") && pathname.includes("/edit"))
     return [{ label: "Funds", href: "/funds" }, { label: "Edit Fund" }]
+  if (pathname.match(/^\/funds\/[^/]+$/))
+    return [{ label: "Funds", href: "/funds" }, { label: "Fund Details" }]
   return [{ label: "Group Fund" }]
 }
 
-export function SiteHeader() {
+export function SiteHeader({ user }: { user?: User }) {
   const pathname = usePathname()
   const crumbs = getBreadcrumbs(pathname)
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => setMounted(true), [])
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 overflow-hidden border-b px-4">
@@ -74,6 +90,23 @@ export function SiteHeader() {
           ))}
         </BreadcrumbList>
       </Breadcrumb>
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {mounted && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+          >
+            {resolvedTheme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            <span className="sr-only">Toggle theme</span>
+          </Button>
+        )}
+        {user && (
+          <span className="text-muted-foreground hidden text-xs sm:inline">
+            {user.name}
+          </span>
+        )}
+      </div>
     </header>
   )
 }
