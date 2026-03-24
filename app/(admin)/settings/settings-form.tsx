@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useActionState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +22,40 @@ type Settings = {
   groupName: string
   defaultMonthlyAmount: number
   financialYearStart: number
+}
+
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  return (
+    <Card className="max-w-lg">
+      <CardHeader>
+        <CardTitle>Appearance</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <Label>Theme</Label>
+          <Select value={theme} onValueChange={(v) => v && setTheme(v)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select theme" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">Light</SelectItem>
+              <SelectItem value="dark">Dark</SelectItem>
+              <SelectItem value="system">System</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 export function SettingsForm({ settings }: { settings: Settings }) {
