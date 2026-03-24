@@ -16,6 +16,26 @@ const fontMono = Geist_Mono({
 export const metadata = {
   title: "Group Fund",
   description: "Group fund management system",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Group Fund",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+}
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({
