@@ -1,9 +1,31 @@
-import { auth } from "@/lib/auth"
 import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-export default auth((req) => {
+function getSessionToken(req: NextRequest) {
+  return (
+    req.cookies.get("__Secure-authjs.session-token")?.value ||
+    req.cookies.get("authjs.session-token")?.value
+  )
+}
+
+function parseJwtPayload(token: string) {
+  try {
+    const parts = token.split(".")
+    if (parts.length !== 3) return null
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf-8")
+    )
+    return payload
+  } catch {
+    return null
+  }
+}
+
+export default function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
-  const isLoggedIn = !!req.auth
+  const token = getSessionToken(req)
+  const payload = token ? parseJwtPayload(token) : null
+  const isLoggedIn = !!payload
 
   // Public paths
   if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
@@ -19,7 +41,7 @@ export default auth((req) => {
   }
 
   // Role-based routing
-  const role = req.auth?.user?.role
+  const role = payload?.role as string | undefined
 
   // Admin routes — only admins
   if (
@@ -46,8 +68,8 @@ export default auth((req) => {
   }
 
   return NextResponse.next()
-})
+}
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|uploads).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|uploads|icon-|apple-touch-icon|manifest).*)"],
 }
