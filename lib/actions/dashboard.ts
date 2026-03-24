@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/lib/db"
+import { getCurrentMonthKey } from "@/lib/format"
 
 function buildDateFilter(from?: string, to?: string) {
   const where: { date?: { gte?: Date; lte?: Date } } = {}
@@ -84,4 +85,18 @@ export async function getRecentActivity(from?: string, to?: string) {
   ].sort((a, b) => b.date.getTime() - a.date.getTime())
 
   return activities.slice(0, 8)
+}
+
+export async function getCollectionRate() {
+  const month = getCurrentMonthKey()
+  const [totalActive, paidMembers] = await Promise.all([
+    db.member.count({ where: { isActive: true } }),
+    db.receipt.groupBy({
+      by: ["memberId"],
+      where: { forMonth: month },
+    }),
+  ])
+  const paidCount = paidMembers.length
+  const rate = totalActive > 0 ? (paidCount / totalActive) * 100 : 0
+  return { paidCount, totalActive, rate, month }
 }

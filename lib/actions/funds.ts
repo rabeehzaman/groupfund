@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
 import { fundSchema } from "@/lib/validations/fund"
+import { requireAdmin } from "@/lib/auth-utils"
 
 export async function getFunds() {
   return db.fund.findMany({
@@ -34,6 +35,7 @@ export async function createFund(
   _prevState: unknown,
   formData: FormData
 ) {
+  await requireAdmin()
   const raw: Record<string, unknown> = {
     name: formData.get("name"),
     type: formData.get("type"),
@@ -84,6 +86,7 @@ export async function updateFund(
   _prevState: unknown,
   formData: FormData
 ) {
+  await requireAdmin()
   const existing = await db.fund.findUnique({ where: { id } })
   if (!existing) return { error: { name: ["Fund not found"] } }
 
@@ -133,6 +136,7 @@ export async function updateFund(
 }
 
 export async function deleteFund(id: string) {
+  await requireAdmin()
   const fund = await db.fund.findUnique({
     where: { id },
     include: { _count: { select: { receipts: true } } },

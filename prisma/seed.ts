@@ -5,6 +5,7 @@ import { neonConfig } from "@neondatabase/serverless"
 import { PrismaNeon } from "@prisma/adapter-neon"
 import { PrismaClient } from "@prisma/client"
 import ws from "ws"
+import bcrypt from "bcryptjs"
 
 neonConfig.webSocketConstructor = ws as unknown as typeof WebSocket
 
@@ -122,6 +123,13 @@ const members: {
   { name: "Pradeep Kumar", branch: "Thirur-Pookkayil", payments: [null, null, 600, null, null, null, null] },
 ]
 
+// Generate email from name + branch
+function generateEmail(name: string, branch: string): string {
+  const cleanName = name.toLowerCase().replace(/\s+/g, "")
+  const cleanBranch = branch.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9]/g, "")
+  return `${cleanName}.${cleanBranch}@groupfund.com`
+}
+
 // Spread a total amount into monthly receipts
 function spreadAmount(total: number, monthlyAmount: number): number[] {
   const result: number[] = []
@@ -139,9 +147,22 @@ async function main() {
   // Clear existing data
   await prisma.receipt.deleteMany()
   await prisma.payment.deleteMany()
+  await prisma.user.deleteMany()
   await prisma.member.deleteMany()
   await prisma.fund.deleteMany()
   console.log("Cleared existing data.")
+
+  // Create admin user
+  const adminHash = await bcrypt.hash("admin123", 12)
+  await prisma.user.create({
+    data: {
+      email: "admin@groupfund.com",
+      passwordHash: adminHash,
+      name: "Admin",
+      role: "ADMIN",
+    },
+  })
+  console.log("Admin user created (admin@groupfund.com / admin123)")
 
   // Upsert settings
   await prisma.settings.upsert({
@@ -169,7 +190,9 @@ async function main() {
   })
   console.log("Default fund created:", defaultFund.name)
 
-  // Create all members first
+  // Create all members with login accounts
+  const memberPassword = await bcrypt.hash("member123", 12)
+
   for (let i = 0; i < members.length; i++) {
     const memberData = members[i]
 
@@ -181,6 +204,8 @@ async function main() {
       }
     }
 
+    const email = generateEmail(memberData.name, memberData.branch)
+
     const member = await prisma.member.create({
       data: {
         name: memberData.name,
@@ -188,6 +213,17 @@ async function main() {
         monthlyAmount: MONTHLY_AMOUNT,
         joinDate: new Date(`${joinYear}-01-01`),
         isActive: true,
+      },
+    })
+
+    // Create login account for this member
+    await prisma.user.create({
+      data: {
+        email,
+        passwordHash: memberPassword,
+        name: memberData.name,
+        role: "MEMBER",
+        memberId: member.id,
       },
     })
 
@@ -230,7 +266,7 @@ async function main() {
     }
 
     console.log(
-      `  Member ${i + 1}/${members.length}: ${memberData.name} - ${memberData.branch} (${receipts.length} receipts)`
+      `  Member ${i + 1}/${members.length}: ${memberData.name} - ${memberData.branch} | ${email} (${receipts.length} receipts)`
     )
   }
 

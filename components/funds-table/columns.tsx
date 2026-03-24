@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency } from "@/lib/format"
@@ -23,7 +24,12 @@ export const columns: ColumnDef<FundRow>[] = [
     header: "Name",
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
-        <span className="font-medium">{row.getValue("name")}</span>
+        <Link
+          href={`/funds/${row.original.id}`}
+          className="font-medium hover:underline"
+        >
+          {row.getValue("name")}
+        </Link>
         {row.original.isDefault && (
           <Badge variant="outline" className="text-xs">
             Default

@@ -37,3 +37,8 @@ pnpm-debug.log*
 next-env.d.ts
 
 /generated/prisma
+.vercel
+
+# uploads
+public/uploads/
+.playwright-mcp/

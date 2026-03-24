@@ -10,7 +10,9 @@ import {
   getDashboardStats,
   getCollectionTrend,
   getRecentActivity,
+  getCollectionRate,
 } from "@/lib/actions/dashboard"
+import { CollectionRateCard } from "@/components/collection-rate-card"
 import { formatCurrency, formatDate } from "@/lib/format"
 
 export default async function DashboardPage({
@@ -19,10 +21,11 @@ export default async function DashboardPage({
   searchParams: Promise<{ from?: string; to?: string }>
 }) {
   const { from, to } = await searchParams
-  const [stats, trend, activity] = await Promise.all([
+  const [stats, trend, activity, collectionRate] = await Promise.all([
     getDashboardStats(from, to),
     getCollectionTrend(from, to),
     getRecentActivity(from, to),
+    getCollectionRate(),
   ])
 
   return (
@@ -55,6 +58,8 @@ export default async function DashboardPage({
       </Suspense>
 
       <SectionCards stats={stats} />
+
+      <CollectionRateCard data={collectionRate} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

@@ -1,14 +1,16 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { Pencil, IndianRupee, CalendarCheck, Banknote, Activity } from "lucide-react"
+import { Pencil, IndianRupee, CalendarCheck, Banknote, Activity, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getMemberWithStats } from "@/lib/actions/members"
 import { getActiveFunds } from "@/lib/actions/funds"
+import { getDefaulterStatus } from "@/lib/actions/defaulters"
 import { formatCurrency, formatMonthYear, formatDate } from "@/lib/format"
 import { PaymentGrid } from "@/components/payment-grid"
+import { DefaulterBadge } from "@/components/defaulter-badge"
 import { MemberDeleteButton } from "./member-delete-button"
 
 export default async function MemberDetailPage({
@@ -17,9 +19,10 @@ export default async function MemberDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [member, funds] = await Promise.all([
+  const [member, funds, defaulterStatus] = await Promise.all([
     getMemberWithStats(id),
     getActiveFunds(),
+    getDefaulterStatus(id),
   ])
 
   if (!member) notFound()
@@ -93,12 +96,22 @@ export default async function MemberDetailPage({
             <Badge variant={member.isActive ? "default" : "secondary"}>
               {member.isActive ? "Active" : "Inactive"}
             </Badge>
+            {defaulterStatus && (
+              <DefaulterBadge
+                months={defaulterStatus.consecutiveUnpaid}
+                severity={defaulterStatus.severity}
+              />
+            )}
           </div>
           <p className="text-muted-foreground mt-1">
             {member.branch || "No branch"}
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" render={<Link href={`/receipts/new?memberId=${id}`} />}>
+              <Plus className="mr-2 size-4" />
+              Record Payment
+          </Button>
           <Button variant="outline" size="sm" render={<Link href={`/members/${id}/edit`} />}>
               <Pencil className="mr-2 size-4" />
               Edit

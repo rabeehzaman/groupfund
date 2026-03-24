@@ -41,17 +41,19 @@ export function ReceiptForm({
   receipt,
   members,
   funds,
+  defaultMemberId,
 }: {
   receipt?: Receipt
   members: Member[]
   funds: Fund[]
+  defaultMemberId?: string
 }) {
   const action = receipt
     ? updateReceipt.bind(null, receipt.id)
     : createReceipt
 
   const [state, formAction, isPending] = useActionState(action, null)
-  const [memberId, setMemberId] = useState(receipt?.memberId ?? "")
+  const [memberId, setMemberId] = useState(receipt?.memberId ?? defaultMemberId ?? "")
   const [fundId, setFundId] = useState(receipt?.fundId ?? (funds.length === 1 ? funds[0].id : ""))
   const selectedFund = funds.find((f) => f.id === fundId)
 

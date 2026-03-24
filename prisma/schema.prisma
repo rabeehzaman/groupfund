@@ -11,6 +11,29 @@ enum FundType {
   OPEN
 }
 
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum ReceiptStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(MEMBER)
+  memberId     String?  @unique
+  member       Member?  @relation(fields: [memberId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Fund {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -29,32 +52,35 @@ model Fund {
 }
 
 model Member {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String
-  branch        String    @default("")
-  monthlyAmount Float     @default(1000)
-  joinDate      DateTime  @default(now())
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  branch        String   @default("")
+  monthlyAmount Float    @default(1000)
+  joinDate      DateTime @default(now())
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   receipts Receipt[]
+  user     User?
 
   @@unique([name, branch])
 }
 
 model Receipt {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   date      DateTime
   amount    Float
   forMonth  String // "YYYY-MM" format
-  narration String   @default("")
+  narration String        @default("")
+  status    ReceiptStatus @default(VERIFIED)
+  proofUrl  String?
   memberId  String
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  member    Member        @relation(fields: [memberId], references: [id], onDelete: Restrict)
   fundId    String
-  fund      Fund     @relation(fields: [fundId], references: [id], onDelete: Restrict)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  fund      Fund          @relation(fields: [fundId], references: [id], onDelete: Restrict)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   @@index([memberId])
   @@index([forMonth])

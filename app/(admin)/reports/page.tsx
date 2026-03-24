@@ -21,6 +21,7 @@ import { getActiveFunds } from "@/lib/actions/funds"
 import { formatCurrency, formatDate, formatMonthYear } from "@/lib/format"
 import { DateFilter } from "@/components/date-filter"
 import { FundFilter } from "@/components/fund-filter"
+import { ExportButtons } from "@/components/export-buttons"
 
 export default async function ReportsPage({
   searchParams,
@@ -53,6 +54,11 @@ export default async function ReportsPage({
         <Suspense>
           <FundFilter funds={funds.map((f) => ({ id: f.id, name: f.name, type: f.type }))} />
         </Suspense>
+        <ExportButtons
+          endpoint="/api/export/report"
+          searchParams={`${from ? `from=${from}` : ""}${to ? `&to=${to}` : ""}${fundId ? `&fundId=${fundId}` : ""}`}
+          label="Export Report"
+        />
       </div>
 
       <Tabs defaultValue="memberwise">

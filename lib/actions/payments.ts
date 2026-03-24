@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
 import { paymentSchema } from "@/lib/validations/payment"
+import { requireAdmin } from "@/lib/auth-utils"
 
 export async function getPayments(from?: string, to?: string) {
   const where: { date?: { gte?: Date; lte?: Date } } = {}
@@ -20,6 +21,7 @@ export async function getPayment(id: string) {
 }
 
 export async function createPayment(_prevState: unknown, formData: FormData) {
+  await requireAdmin()
   const parsed = paymentSchema.safeParse({
     date: formData.get("date"),
     amount: formData.get("amount"),
@@ -39,6 +41,7 @@ export async function createPayment(_prevState: unknown, formData: FormData) {
 }
 
 export async function updatePayment(id: string, _prevState: unknown, formData: FormData) {
+  await requireAdmin()
   const parsed = paymentSchema.safeParse({
     date: formData.get("date"),
     amount: formData.get("amount"),
@@ -58,6 +61,7 @@ export async function updatePayment(id: string, _prevState: unknown, formData: F
 }
 
 export async function deletePayment(id: string) {
+  await requireAdmin()
   await db.payment.delete({ where: { id } })
   revalidatePath("/payments")
   revalidatePath("/dashboard")

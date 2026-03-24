@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
 import { receiptSchema } from "@/lib/validations/receipt"
+import { requireAdmin } from "@/lib/auth-utils"
 
 export async function getReceipts(from?: string, to?: string, fundId?: string) {
   const where: { date?: { gte?: Date; lte?: Date }; fundId?: string } = {}
@@ -34,6 +35,7 @@ export async function getReceipt(id: string) {
 }
 
 export async function createReceipt(_prevState: unknown, formData: FormData) {
+  await requireAdmin()
   let fundId = formData.get("fundId") as string | null
   if (!fundId) {
     const defaultFund = await db.fund.findFirst({ where: { isDefault: true } })
@@ -62,6 +64,7 @@ export async function createReceipt(_prevState: unknown, formData: FormData) {
 }
 
 export async function updateReceipt(id: string, _prevState: unknown, formData: FormData) {
+  await requireAdmin()
   let fundId = formData.get("fundId") as string | null
   if (!fundId) {
     const existing = await db.receipt.findUnique({ where: { id }, select: { fundId: true } })
@@ -93,9 +96,17 @@ export async function updateReceipt(id: string, _prevState: unknown, formData: F
 }
 
 export async function deleteReceipt(id: string) {
+  await requireAdmin()
   await db.receipt.delete({ where: { id } })
   revalidatePath("/receipts")
   revalidatePath("/dashboard")
+  return { success: true }
+}
+
+export async function updateReceiptStatus(id: string, status: "VERIFIED" | "REJECTED") {
+  await requireAdmin()
+  await db.receipt.update({ where: { id }, data: { status } })
+  revalidatePath("/receipts")
   return { success: true }
 }
 

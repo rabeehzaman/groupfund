@@ -6,6 +6,7 @@ import { getPayments } from "@/lib/actions/payments"
 import { PaymentsDataTable } from "@/components/payments-table/data-table"
 import { columns } from "@/components/payments-table/columns"
 import { DateFilter } from "@/components/date-filter"
+import { ExportButtons } from "@/components/export-buttons"
 
 export default async function PaymentsPage({
   searchParams,
@@ -24,10 +25,16 @@ export default async function PaymentsPage({
             Track group expenses and payouts.
           </p>
         </div>
-        <Button size="sm" render={<Link href="/payments/new" />}>
-            <Plus className="mr-2 size-4" />
-            Add Payment
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportButtons
+            endpoint="/api/export/payments"
+            searchParams={`${from ? `from=${from}` : ""}${to ? `&to=${to}` : ""}`}
+          />
+          <Button size="sm" render={<Link href="/payments/new" />}>
+              <Plus className="mr-2 size-4" />
+              Add Payment
+          </Button>
+        </div>
       </div>
       <Suspense>
         <DateFilter />

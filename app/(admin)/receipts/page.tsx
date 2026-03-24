@@ -7,6 +7,7 @@ import { getReceipts } from "@/lib/actions/receipts"
 import { ReceiptsDataTable } from "@/components/receipts-table/data-table"
 import { columns } from "@/components/receipts-table/columns"
 import { DateFilter } from "@/components/date-filter"
+import { ExportButtons } from "@/components/export-buttons"
 import { format, startOfMonth, subMonths, endOfMonth } from "date-fns"
 
 export default async function ReceiptsPage({
@@ -32,6 +33,10 @@ export default async function ReceiptsPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <ExportButtons
+            endpoint="/api/export/receipts"
+            searchParams={`${from ? `from=${from}` : ""}${to ? `&to=${to}` : ""}`}
+          />
           <Button variant="outline" size="sm" render={<Link href="/receipts/batch" />}>
               <ListChecks className="mr-2 size-4" />
               Batch Entry

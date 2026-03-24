@@ -11,7 +11,11 @@ import {
   Settings,
   Wallet,
   Layers,
+  AlertTriangle,
+  Bell,
+  LogOut,
 } from "lucide-react"
+import { logoutAction } from "@/lib/actions/auth"
 
 import {
   Sidebar,
@@ -27,6 +31,12 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
+type User = {
+  name: string
+  email: string
+  role: string
+}
+
 const mainNav = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Members", href: "/members", icon: Users },
@@ -34,13 +44,15 @@ const mainNav = [
   { title: "Receipts", href: "/receipts", icon: Receipt },
   { title: "Payments", href: "/payments", icon: CreditCard },
   { title: "Reports", href: "/reports", icon: BarChart3 },
+  { title: "Defaulters", href: "/defaulters", icon: AlertTriangle },
+  { title: "Reminders", href: "/reminders", icon: Bell },
 ]
 
 const secondaryNav = [
   { title: "Settings", href: "/settings", icon: Settings },
 ]
 
-export function AppSidebar() {
+export function AppSidebar({ user }: { user: User }) {
   const pathname = usePathname()
 
   return (
@@ -102,7 +114,34 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter />
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                <span className="truncate font-medium">{user.name}</span>
+                <span className="text-muted-foreground truncate text-xs">
+                  {user.email}
+                </span>
+              </div>
+            </div>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <form action={logoutAction}>
+              <SidebarMenuButton
+                render={<button type="submit" className="w-full" />}
+                tooltip="Sign Out"
+              >
+                <LogOut />
+                <span>Sign Out</span>
+              </SidebarMenuButton>
+            </form>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )

@@ -1,6 +1,7 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
+import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatDate, formatMonthYear } from "@/lib/format"
 
 export type ReceiptRow = {
@@ -9,8 +10,16 @@ export type ReceiptRow = {
   amount: number
   forMonth: string
   narration: string
+  status: "PENDING" | "VERIFIED" | "REJECTED"
+  proofUrl: string | null
   member: { name: string; branch: string }
   fund: { name: string }
+}
+
+const statusBadge = {
+  PENDING: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200",
+  VERIFIED: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-200",
+  REJECTED: "bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900 dark:text-red-200",
 }
 
 export const columns: ColumnDef<ReceiptRow>[] = [
@@ -48,6 +57,18 @@ export const columns: ColumnDef<ReceiptRow>[] = [
         {formatCurrency(row.getValue("amount"))}
       </span>
     ),
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => {
+      const status = row.original.status
+      return (
+        <Badge className={statusBadge[status]}>
+          {status === "VERIFIED" ? "Verified" : status === "PENDING" ? "Pending" : "Rejected"}
+        </Badge>
+      )
+    },
   },
   {
     accessorKey: "narration",

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { settingsSchema } from "@/lib/validations/settings"
+import { requireAdmin } from "@/lib/auth-utils"
 
 export async function getSettings() {
   let settings = await db.settings.findUnique({ where: { id: "default" } })
@@ -20,6 +21,7 @@ export async function getSettings() {
 }
 
 export async function updateSettings(_prevState: unknown, formData: FormData) {
+  await requireAdmin()
   const parsed = settingsSchema.safeParse({
     groupName: formData.get("groupName"),
     defaultMonthlyAmount: formData.get("defaultMonthlyAmount"),

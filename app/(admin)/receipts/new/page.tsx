@@ -2,7 +2,12 @@ import { ReceiptForm } from "@/components/receipt-form"
 import { getMembers } from "@/lib/actions/members"
 import { getActiveFunds } from "@/lib/actions/funds"
 
-export default async function NewReceiptPage() {
+export default async function NewReceiptPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ memberId?: string }>
+}) {
+  const { memberId } = await searchParams
   const [members, funds] = await Promise.all([getMembers(), getActiveFunds()])
 
   return (
@@ -20,6 +25,7 @@ export default async function NewReceiptPage() {
           type: f.type,
           amount: f.amount,
         }))}
+        defaultMemberId={memberId}
       />
     </div>
   )
