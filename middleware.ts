@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { decode } from "@auth/core/jwt"
+
+const SECRET = process.env.AUTH_SECRET!
 
 function getSessionToken(req: NextRequest) {
   return (
@@ -8,32 +11,33 @@ function getSessionToken(req: NextRequest) {
   )
 }
 
-function parseJwtPayload(token: string) {
+async function getPayload(req: NextRequest) {
+  const token = getSessionToken(req)
+  if (!token) return null
+  const cookieName = req.cookies.has("__Secure-authjs.session-token")
+    ? "__Secure-authjs.session-token"
+    : "authjs.session-token"
   try {
-    const parts = token.split(".")
-    if (parts.length !== 3) return null
-    const payload = JSON.parse(
-      Buffer.from(parts[1], "base64url").toString("utf-8")
-    )
-    return payload
+    return await decode({ token, secret: SECRET, salt: cookieName })
   } catch {
     return null
   }
 }
 
-export default function middleware(req: NextRequest) {
+export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
-  const token = getSessionToken(req)
-  const payload = token ? parseJwtPayload(token) : null
-  const isLoggedIn = !!payload
 
   // Public paths
   if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
-    if (isLoggedIn) {
+    const payload = await getPayload(req)
+    if (payload) {
       return NextResponse.redirect(new URL("/", req.url))
     }
     return NextResponse.next()
   }
+
+  const payload = await getPayload(req)
+  const isLoggedIn = !!payload
 
   // All other routes require auth
   if (!isLoggedIn) {
