@@ -30,7 +30,10 @@ export default async function MemberDetailPage({
   // Group receipts by fund
   const receiptsByFund = new Map<
     string,
-    { fund: { id: string; name: string; type: "FIXED" | "OPEN"; amount: number | null }; receipts: typeof member.receipts }
+    {
+      fund: { id: string; name: string; type: "FIXED" | "OPEN"; amount: number | null; yearlyAmount?: number | null; startDate?: Date | null; createdAt?: Date }
+      receipts: typeof member.receipts
+    }
   >()
   for (const receipt of member.receipts) {
     const fundId = receipt.fund.id
@@ -44,9 +47,13 @@ export default async function MemberDetailPage({
   for (const fund of funds) {
     if (!receiptsByFund.has(fund.id)) {
       receiptsByFund.set(fund.id, {
-        fund: { id: fund.id, name: fund.name, type: fund.type, amount: fund.amount },
+        fund: { id: fund.id, name: fund.name, type: fund.type, amount: fund.amount, yearlyAmount: fund.yearlyAmount, startDate: fund.startDate, createdAt: fund.createdAt },
         receipts: [],
       })
+    } else {
+      // Enrich existing entries with full fund data
+      const entry = receiptsByFund.get(fund.id)!
+      entry.fund = { ...entry.fund, yearlyAmount: fund.yearlyAmount, startDate: fund.startDate, createdAt: fund.createdAt }
     }
   }
 
@@ -64,8 +71,8 @@ export default async function MemberDetailPage({
       bg: "bg-emerald-100 dark:bg-emerald-950",
     },
     {
-      title: "Months Paid",
-      value: String(member.monthsPaid),
+      title: "Payments",
+      value: String(member.paymentsCount),
       icon: CalendarCheck,
       color: "text-blue-600",
       bg: "bg-blue-100 dark:bg-blue-950",
@@ -98,7 +105,7 @@ export default async function MemberDetailPage({
             </Badge>
             {defaulterStatus && (
               <DefaulterBadge
-                months={defaulterStatus.consecutiveUnpaid}
+                pendingAmount={defaulterStatus.pendingAmount}
                 severity={defaulterStatus.severity}
               />
             )}
@@ -171,6 +178,8 @@ export default async function MemberDetailPage({
               joinDate={member.joinDate}
               fundType={entry.fund.type}
               title={`${entry.fund.name} Grid`}
+              fundStartDate={entry.fund.startDate ?? entry.fund.createdAt ?? undefined}
+              yearlyAmount={entry.fund.yearlyAmount}
             />
 
             <Card>
@@ -199,7 +208,9 @@ export default async function MemberDetailPage({
                         >
                           <div>
                             <p className="font-medium">
-                              {formatMonthYear(receipt.forMonth)}
+                              {receipt.forMonth
+                                ? formatMonthYear(receipt.forMonth)
+                                : formatDate(receipt.date)}
                             </p>
                             <p className="text-muted-foreground text-xs">
                               {receipt.narration || "No narration"}{" "}

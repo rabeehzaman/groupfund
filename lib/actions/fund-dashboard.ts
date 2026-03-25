@@ -2,7 +2,6 @@
 
 import { db } from "@/lib/db"
 import { requireAuth } from "@/lib/auth-utils"
-import { getMonthsBetween } from "@/lib/format"
 
 export async function getFundDashboard(fundId: string) {
   await requireAuth()
@@ -36,9 +35,8 @@ export async function getFundDashboard(fundId: string) {
 
   if (fund.type === "FIXED") {
     const activeMembers = await db.member.count({ where: { isActive: true } })
-    const months = getMonthsBetween(fund.createdAt, new Date())
-    const monthCount = months.length
-    const expected = activeMembers * (fund.amount || 0) * monthCount
+    const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
+    const expected = activeMembers * yearlyAmount
     const progress = expected > 0 ? (collected / expected) * 100 : 0
 
     return {
@@ -48,7 +46,7 @@ export async function getFundDashboard(fundId: string) {
       progress: Math.min(progress, 100),
       type: "FIXED" as const,
       activeMembers,
-      monthCount,
+      yearlyAmount,
       receiptCount: fund._count.receipts,
       uniqueContributors: uniqueContributors.length,
       recentReceipts,

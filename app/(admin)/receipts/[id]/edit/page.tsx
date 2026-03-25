@@ -33,6 +33,7 @@ export default async function EditReceiptPage({
           name: f.name,
           type: f.type,
           amount: f.amount,
+          yearlyAmount: f.yearlyAmount,
         }))}
       />
     </div>

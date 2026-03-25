@@ -20,6 +20,7 @@ import { MONTHS } from "@/lib/constants"
 type Settings = {
   groupName: string
   defaultMonthlyAmount: number
+  defaultYearlyAmount: number
   financialYearStart: number
 }
 
@@ -55,8 +56,24 @@ export function SettingsForm({ settings }: { settings: Settings }) {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="defaultYearlyAmount">
+              Default Yearly Amount
+            </Label>
+            <Input
+              id="defaultYearlyAmount"
+              name="defaultYearlyAmount"
+              type="number"
+              min="0"
+              defaultValue={settings.defaultYearlyAmount}
+            />
+            <p className="text-muted-foreground text-xs">
+              Total amount expected per member per year.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="defaultMonthlyAmount">
-              Default Monthly Amount
+              Default Monthly Amount (Legacy)
             </Label>
             <Input
               id="defaultMonthlyAmount"

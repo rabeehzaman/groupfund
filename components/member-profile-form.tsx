@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { useActionState } from "react"
-import { CldUploadWidget } from "next-cloudinary"
+import { useActionState, useEffect, useState } from "react"
+import { toast } from "sonner"
 import Image from "next/image"
+import { CldUploadWidget } from "next-cloudinary"
 import { Camera, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,14 +19,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { DatePicker } from "@/components/date-picker"
-import { createMember, updateMember } from "@/lib/actions/members"
+import { updateMyProfile } from "@/lib/actions/portal"
 
 type Member = {
   id: string
   name: string
   branch: string
-  monthlyAmount: number
-  isActive: boolean
+  joinDate: Date
   photoUrl: string | null
   mobileNumber: string | null
   membershipNumber: string | null
@@ -46,45 +45,54 @@ type Member = {
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
 
-export function MemberForm({ member }: { member?: Member }) {
-  const action = member
-    ? updateMember.bind(null, member.id)
-    : createMember
+export function MemberProfileForm({ member }: { member: Member }) {
+  const [state, formAction, isPending] = useActionState(updateMyProfile, null)
+  const [photoUrl, setPhotoUrl] = useState(member.photoUrl || "")
+  const [memberOfJAA, setMemberOfJAA] = useState(member.memberOfJAA)
+  const [memberOfAKBJAF, setMemberOfAKBJAF] = useState(member.memberOfAKBJAF)
+  const [pmjjby, setPmjjby] = useState(member.pmjjby)
+  const [pmsby, setPmsby] = useState(member.pmsby)
+  const [bloodGroup, setBloodGroup] = useState(member.bloodGroup || "")
 
-  const [state, formAction, isPending] = useActionState(action, null)
-  const [photoUrl, setPhotoUrl] = useState(member?.photoUrl || "")
-  const [memberOfJAA, setMemberOfJAA] = useState(member?.memberOfJAA ?? false)
-  const [memberOfAKBJAF, setMemberOfAKBJAF] = useState(member?.memberOfAKBJAF ?? false)
-  const [pmjjby, setPmjjby] = useState(member?.pmjjby ?? false)
-  const [pmsby, setPmsby] = useState(member?.pmsby ?? false)
-  const [bloodGroup, setBloodGroup] = useState(member?.bloodGroup || "")
+  useEffect(() => {
+    if (state?.success) {
+      toast.success("Profile updated successfully")
+    }
+  }, [state])
 
   return (
-    <Card className="max-w-2xl">
+    <Card>
       <CardHeader>
-        <CardTitle>{member ? "Edit Member" : "Add Member"}</CardTitle>
+        <CardTitle>Edit Profile</CardTitle>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-6">
-          {/* Photo */}
-          <div className="flex items-center gap-4">
+          {/* Photo Upload */}
+          <div className="flex flex-col items-center gap-4">
             <div className="relative">
               {photoUrl ? (
                 <Image
                   src={photoUrl}
-                  alt="Profile"
-                  width={80}
-                  height={80}
-                  className="size-20 rounded-full object-cover border-2 border-muted"
+                  alt={member.name}
+                  width={120}
+                  height={120}
+                  className="size-28 rounded-full object-cover border-2 border-muted"
                 />
               ) : (
-                <div className="flex size-20 items-center justify-center rounded-full bg-muted">
-                  <User className="size-8 text-muted-foreground" />
+                <div className="flex size-28 items-center justify-center rounded-full bg-muted border-2 border-muted-foreground/20">
+                  <User className="size-12 text-muted-foreground" />
                 </div>
               )}
               <CldUploadWidget
                 signatureEndpoint="/api/cloudinary-sign"
-                options={{ maxFiles: 1, resourceType: "image", folder: "bizarchcollective/profiles", cropping: true, croppingAspectRatio: 1 }}
+                options={{
+                  maxFiles: 1,
+                  resourceType: "image",
+                  folder: "bizarchcollective/profiles",
+                  cropping: true,
+                  croppingAspectRatio: 1,
+                  croppingShowDimensions: true,
+                }}
                 onSuccess={(result) => {
                   if (typeof result.info === "object" && result.info?.secure_url) {
                     setPhotoUrl(result.info.secure_url)
@@ -95,14 +103,18 @@ export function MemberForm({ member }: { member?: Member }) {
                   <button
                     type="button"
                     onClick={() => open()}
-                    className="absolute bottom-0 right-0 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+                    className="absolute bottom-0 right-0 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
                   >
-                    <Camera className="size-3" />
+                    <Camera className="size-4" />
                   </button>
                 )}
               </CldUploadWidget>
             </div>
             <input type="hidden" name="photoUrl" value={photoUrl} />
+            <div className="text-center">
+              <p className="font-semibold text-lg">{member.name}</p>
+              <p className="text-muted-foreground text-sm">{member.branch || "No branch"}</p>
+            </div>
           </div>
 
           {/* Basic Info */}
@@ -110,43 +122,11 @@ export function MemberForm({ member }: { member?: Member }) {
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Basic Information</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  defaultValue={member?.name}
-                  placeholder="Enter member name"
-                  required
-                />
-                {state?.error?.name && (
-                  <p className="text-destructive text-sm">{state.error.name[0]}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="branch">Branch / Area</Label>
-                <Input
-                  id="branch"
-                  name="branch"
-                  defaultValue={member?.branch}
-                  placeholder="Enter branch or area"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="monthlyAmount">Monthly Amount</Label>
-                <Input
-                  id="monthlyAmount"
-                  name="monthlyAmount"
-                  type="number"
-                  min="0"
-                  defaultValue={member?.monthlyAmount ?? 1000}
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="mobileNumber">Mobile Number</Label>
                 <Input
                   id="mobileNumber"
                   name="mobileNumber"
-                  defaultValue={member?.mobileNumber || ""}
+                  defaultValue={member.mobileNumber || ""}
                   placeholder="Enter mobile number"
                 />
               </div>
@@ -155,17 +135,8 @@ export function MemberForm({ member }: { member?: Member }) {
                 <Input
                   id="membershipNumber"
                   name="membershipNumber"
-                  defaultValue={member?.membershipNumber || ""}
+                  defaultValue={member.membershipNumber || ""}
                   placeholder="Enter membership number"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="presentDesignation">Present Designation</Label>
-                <Input
-                  id="presentDesignation"
-                  name="presentDesignation"
-                  defaultValue={member?.presentDesignation || ""}
-                  placeholder="Enter designation"
                 />
               </div>
             </div>
@@ -179,7 +150,7 @@ export function MemberForm({ member }: { member?: Member }) {
                 <Label>Date of Birth</Label>
                 <DatePicker
                   name="dateOfBirth"
-                  defaultValue={member?.dateOfBirth ? new Date(member.dateOfBirth) : undefined}
+                  defaultValue={member.dateOfBirth ? new Date(member.dateOfBirth) : undefined}
                   placeholder="Select DOB"
                 />
               </div>
@@ -187,16 +158,16 @@ export function MemberForm({ member }: { member?: Member }) {
                 <Label>Date of Association</Label>
                 <DatePicker
                   name="dateOfAssociation"
-                  defaultValue={member?.dateOfAssociation ? new Date(member.dateOfAssociation) : undefined}
+                  defaultValue={member.dateOfAssociation ? new Date(member.dateOfAssociation) : undefined}
                   placeholder="Select DOA"
                 />
               </div>
             </div>
           </div>
 
-          {/* Associations & Insurance */}
+          {/* Associations */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Associations & Insurance</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Associations</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex items-center gap-3">
                 <input type="hidden" name="memberOfJAA" value={String(memberOfJAA)} />
@@ -217,32 +188,60 @@ export function MemberForm({ member }: { member?: Member }) {
                 <Label htmlFor="memberOfAKBJAF" className="cursor-pointer">Member of AKBJAF</Label>
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="presentDesignation">Present Designation</Label>
+              <Input
+                id="presentDesignation"
+                name="presentDesignation"
+                defaultValue={member.presentDesignation || ""}
+                placeholder="Enter current designation"
+              />
+            </div>
+          </div>
+
+          {/* Insurance */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Insurance</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <input type="hidden" name="pmjjby" value={String(pmjjby)} />
-                <Checkbox id="pmjjby" checked={pmjjby} onCheckedChange={(checked) => setPmjjby(!!checked)} />
+                <Checkbox
+                  id="pmjjby"
+                  checked={pmjjby}
+                  onCheckedChange={(checked) => setPmjjby(!!checked)}
+                />
                 <Label htmlFor="pmjjby" className="cursor-pointer">PMJJBY (Life Cover)</Label>
               </div>
               {pmjjby && (
-                <div className="pl-8">
+                <div className="space-y-2 pl-8">
+                  <Label htmlFor="pmjjbyDetails">Policy Details</Label>
                   <Input
+                    id="pmjjbyDetails"
                     name="pmjjbyDetails"
-                    defaultValue={member?.pmjjbyDetails || ""}
-                    placeholder="Policy number or details"
+                    defaultValue={member.pmjjbyDetails || ""}
+                    placeholder="Enter policy number or details"
                   />
                 </div>
               )}
+            </div>
+            <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <input type="hidden" name="pmsby" value={String(pmsby)} />
-                <Checkbox id="pmsby" checked={pmsby} onCheckedChange={(checked) => setPmsby(!!checked)} />
+                <Checkbox
+                  id="pmsby"
+                  checked={pmsby}
+                  onCheckedChange={(checked) => setPmsby(!!checked)}
+                />
                 <Label htmlFor="pmsby" className="cursor-pointer">PMSBY (Accident Cover)</Label>
               </div>
               {pmsby && (
-                <div className="pl-8">
+                <div className="space-y-2 pl-8">
+                  <Label htmlFor="pmsbyDetails">Policy Details</Label>
                   <Input
+                    id="pmsbyDetails"
                     name="pmsbyDetails"
-                    defaultValue={member?.pmsbyDetails || ""}
-                    placeholder="Policy number or details"
+                    defaultValue={member.pmsbyDetails || ""}
+                    placeholder="Enter policy number or details"
                   />
                 </div>
               )}
@@ -256,14 +255,16 @@ export function MemberForm({ member }: { member?: Member }) {
               <Label>Blood Group</Label>
               <input type="hidden" name="bloodGroup" value={bloodGroup} />
               <Select value={bloodGroup} onValueChange={(v) => setBloodGroup(v ?? "")}>
-                <SelectTrigger className="w-full sm:w-48">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select blood group">
                     {bloodGroup || "Select blood group"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {BLOOD_GROUPS.map((bg) => (
-                    <SelectItem key={bg} value={bg}>{bg}</SelectItem>
+                    <SelectItem key={bg} value={bg}>
+                      {bg}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -273,7 +274,7 @@ export function MemberForm({ member }: { member?: Member }) {
               <Textarea
                 id="branchAddress"
                 name="branchAddress"
-                defaultValue={member?.branchAddress || ""}
+                defaultValue={member.branchAddress || ""}
                 placeholder="Enter branch address"
                 rows={2}
               />
@@ -283,26 +284,16 @@ export function MemberForm({ member }: { member?: Member }) {
               <Textarea
                 id="homeAddress"
                 name="homeAddress"
-                defaultValue={member?.homeAddress || ""}
+                defaultValue={member.homeAddress || ""}
                 placeholder="Enter home address"
                 rows={2}
               />
             </div>
           </div>
 
-          {member && (
-            <input
-              type="hidden"
-              name="isActive"
-              value={String(member.isActive)}
-            />
-          )}
-
-          <div className="flex gap-2">
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Saving..." : member ? "Update" : "Add Member"}
-            </Button>
-          </div>
+          <Button type="submit" disabled={isPending} className="w-full">
+            {isPending ? "Saving..." : "Save Profile"}
+          </Button>
         </form>
       </CardContent>
     </Card>

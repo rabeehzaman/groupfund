@@ -24,6 +24,7 @@ export default async function NewReceiptPage({
           name: f.name,
           type: f.type,
           amount: f.amount,
+          yearlyAmount: f.yearlyAmount,
         }))}
         defaultMemberId={memberId}
       />

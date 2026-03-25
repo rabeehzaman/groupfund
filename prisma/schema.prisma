@@ -35,31 +35,48 @@ model User {
 }
 
 model Fund {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  type        FundType @default(FIXED)
-  amount      Float? // per-member target; required for FIXED, null for OPEN
-  goalAmount  Float? // optional total fundraising goal for OPEN funds
-  description String   @default("")
-  purpose     String   @default("") // what the collected fund will be used for
-  isRecurring Boolean  @default(true) // true = monthly, false = one-time
-  isActive    Boolean  @default(true)
-  isDefault   Boolean  @default(false) // marks the auto-created monthly fund
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String    @id @default(cuid())
+  name         String    @unique
+  type         FundType  @default(FIXED)
+  amount       Float? // per-member target (legacy monthly); required for FIXED, null for OPEN
+  yearlyAmount Float? // total yearly expected amount per member
+  goalAmount   Float? // optional total fundraising goal for OPEN funds
+  description  String    @default("")
+  purpose      String    @default("") // what the collected fund will be used for
+  isRecurring  Boolean   @default(true) // true = yearly recurring, false = one-time
+  isActive     Boolean   @default(true)
+  isDefault    Boolean   @default(false) // marks the auto-created fund
+  startDate    DateTime? // when billing starts; falls back to createdAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   receipts Receipt[]
 }
 
 model Member {
-  id            String   @id @default(cuid())
-  name          String
-  branch        String   @default("")
-  monthlyAmount Float    @default(1000)
-  joinDate      DateTime @default(now())
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  name               String
+  branch             String    @default("")
+  monthlyAmount      Float     @default(1000)
+  joinDate           DateTime  @default(now())
+  isActive           Boolean   @default(true)
+  photoUrl           String?
+  mobileNumber       String?
+  membershipNumber   String?
+  dateOfBirth        DateTime?
+  dateOfAssociation  DateTime?
+  memberOfJAA        Boolean   @default(false)
+  memberOfAKBJAF     Boolean   @default(false)
+  presentDesignation String?
+  pmjjby             Boolean   @default(false)
+  pmjjbyDetails      String?
+  pmsby              Boolean   @default(false)
+  pmsbyDetails       String?
+  bloodGroup         String?
+  branchAddress      String    @default("")
+  homeAddress        String    @default("")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   receipts Receipt[]
   user     User?
@@ -71,7 +88,7 @@ model Receipt {
   id        String        @id @default(cuid())
   date      DateTime
   amount    Float
-  forMonth  String // "YYYY-MM" format
+  forMonth  String? // "YYYY-MM" format, optional for yearly mode
   narration String        @default("")
   status    ReceiptStatus @default(VERIFIED)
   proofUrl  String?
@@ -105,6 +122,7 @@ model Settings {
   id                   String   @id @default("default")
   groupName            String   @default("Group Fund")
   defaultMonthlyAmount Float    @default(1000)
+  defaultYearlyAmount  Float    @default(3000)
   financialYearStart   Int      @default(7) // month number (7=July)
   updatedAt            DateTime @updatedAt
 }

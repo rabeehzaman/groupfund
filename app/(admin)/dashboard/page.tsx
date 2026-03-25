@@ -63,7 +63,7 @@ export default async function DashboardPage({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <CollectionTrend data={trend} />
+          <CollectionTrend data={trend.filter((t): t is { month: string; amount: number } => t.month !== null)} />
         </div>
 
         <Card>

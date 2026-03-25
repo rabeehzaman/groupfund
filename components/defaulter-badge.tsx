@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge"
+import { formatCurrency } from "@/lib/format"
 
 const severityClasses = {
   yellow:
@@ -9,15 +10,15 @@ const severityClasses = {
 }
 
 export function DefaulterBadge({
-  months,
+  pendingAmount,
   severity,
 }: {
-  months: number
+  pendingAmount: number
   severity: "yellow" | "orange" | "red"
 }) {
   return (
     <Badge className={severityClasses[severity]}>
-      {months}m overdue
+      {formatCurrency(pendingAmount)} pending
     </Badge>
   )
 }

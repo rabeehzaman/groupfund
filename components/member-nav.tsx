@@ -2,12 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Receipt, Upload, LogOut, Wallet } from "lucide-react"
+import { LayoutDashboard, Receipt, Upload, LogOut, Wallet, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { logoutAction } from "@/lib/actions/auth"
 
 const navItems = [
   { title: "Dashboard", href: "/portal", icon: LayoutDashboard },
+  { title: "Profile", href: "/portal/profile", icon: User },
   { title: "My Payments", href: "/portal/payments", icon: Receipt },
   { title: "Upload Proof", href: "/portal/upload", icon: Upload },
 ]

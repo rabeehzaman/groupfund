@@ -21,7 +21,7 @@ export async function getMemberWiseReport(from?: string, to?: string, fundId?: s
     if (to) receiptWhere.date.lte = new Date(to + "T23:59:59.999Z")
   }
 
-  const [members, fund] = await Promise.all([
+  const [members, fund, settings] = await Promise.all([
     db.member.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },
@@ -30,45 +30,64 @@ export async function getMemberWiseReport(from?: string, to?: string, fundId?: s
       },
     }),
     fundId ? db.fund.findUnique({ where: { id: fundId } }) : null,
+    db.settings.findUnique({ where: { id: "default" } }),
   ])
 
-  const settings = await db.settings.findUnique({ where: { id: "default" } })
   const isOpenFund = fund?.type === "OPEN"
 
-  // Determine the date range for expected months calculation
-  const rangeEnd = to ? new Date(to) : new Date()
-  const rangeStart = from ? new Date(from) : null
+  // Get the fund's effective start date
+  const fundStartDate = fund ? new Date(fund.startDate ?? fund.createdAt) : null
 
   return members.map((member) => {
     const totalPaid = member.receipts.reduce((sum, r) => sum + r.amount, 0)
-    const monthsPaid = new Set(member.receipts.map((r) => r.forMonth)).size
+    const paymentsCount = member.receipts.length
 
-    // Calculate expected months within the selected range
-    const joinDate = new Date(member.joinDate)
-    const effectiveStart = rangeStart && rangeStart > joinDate ? rangeStart : joinDate
-    let expectedMonths = 0
-    const current = new Date(effectiveStart.getFullYear(), effectiveStart.getMonth(), 1)
-    const end = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1)
-    while (current <= end) {
-      expectedMonths++
-      current.setMonth(current.getMonth() + 1)
+    // For yearly funds: expected = yearlyAmount (full amount, no proration)
+    // For legacy monthly funds (no yearlyAmount): fall back to old monthly calc
+    const yearlyAmount = fund?.yearlyAmount ?? (fund?.amount ? fund.amount * 12 : null)
+
+    let expectedTotal = 0
+    let pendingAmount = 0
+
+    if (isOpenFund) {
+      expectedTotal = 0
+      pendingAmount = 0
+    } else if (yearlyAmount) {
+      // Yearly amount system — full amount expected
+      expectedTotal = yearlyAmount
+      pendingAmount = expectedTotal - totalPaid
+    } else {
+      // Legacy monthly fallback
+      const joinDate = new Date(member.joinDate)
+      const rangeEnd = to ? new Date(to) : new Date()
+      const rangeStart = from ? new Date(from) : null
+
+      // Use the LATER of joinDate, fundStartDate, and rangeStart
+      let baseStart = joinDate
+      if (fundStartDate && fundStartDate > baseStart) baseStart = fundStartDate
+      const effectiveStart = rangeStart && rangeStart > baseStart ? rangeStart : baseStart
+
+      let expectedMonths = 0
+      const current = new Date(effectiveStart.getFullYear(), effectiveStart.getMonth(), 1)
+      const end = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1)
+      while (current <= end) {
+        expectedMonths++
+        current.setMonth(current.getMonth() + 1)
+      }
+
+      const monthlyAmount = fund?.type === "FIXED" && fund.amount
+        ? fund.amount
+        : member.monthlyAmount || settings?.defaultMonthlyAmount || 1000
+      expectedTotal = expectedMonths * monthlyAmount
+      pendingAmount = expectedTotal - totalPaid
     }
-
-    const monthlyAmount = fund?.type === "FIXED" && fund.amount
-      ? fund.amount
-      : member.monthlyAmount || settings?.defaultMonthlyAmount || 1000
-    const expectedTotal = isOpenFund ? 0 : expectedMonths * monthlyAmount
-    const pendingAmount = isOpenFund ? 0 : expectedTotal - totalPaid
-    const pendingMonths = isOpenFund ? 0 : expectedMonths - monthsPaid
 
     return {
       id: member.id,
       name: member.name,
       branch: member.branch,
       totalPaid,
-      monthsPaid,
-      expectedMonths,
-      pendingMonths,
+      paymentsCount,
       expectedTotal,
       pendingAmount,
       isOpenFund,
@@ -108,7 +127,7 @@ export async function getOverallSummary(from?: string, to?: string, fundId?: str
 
   // Merge all months from both collections and expenses
   const allMonths = new Set<string>()
-  receiptsByMonth.forEach((m) => allMonths.add(m.forMonth))
+  receiptsByMonth.forEach((m) => { if (m.forMonth) allMonths.add(m.forMonth) })
   Object.keys(expensesByMonth).forEach((m) => allMonths.add(m))
   const sortedMonths = Array.from(allMonths).sort()
 
@@ -163,7 +182,7 @@ export async function getTransactionTimeline(from?: string, to?: string, fundId?
       type: "receipt" as const,
       date: r.date,
       amount: r.amount,
-      description: `${r.member.name} - ${r.fund.name} (${r.forMonth})`,
+      description: `${r.member.name} - ${r.fund.name}${r.forMonth ? ` (${r.forMonth})` : ""}`,
       narration: r.narration,
     })),
     ...payments.map((p) => ({

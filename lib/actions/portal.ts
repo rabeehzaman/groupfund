@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
+import { memberProfileSchema } from "@/lib/validations/member"
 
 async function getMyMemberId() {
   const session = await auth()
@@ -29,9 +30,61 @@ export async function getMyDashboard() {
   if (!member) redirect("/login")
 
   const totalPaid = member.receipts.reduce((sum, r) => sum + r.amount, 0)
-  const monthsPaid = new Set(member.receipts.map((r) => r.forMonth)).size
+  const paymentsCount = member.receipts.length
 
-  return { member, totalPaid, monthsPaid }
+  return { member, totalPaid, paymentsCount }
+}
+
+export async function getMyProfile() {
+  const memberId = await getMyMemberId()
+
+  const member = await db.member.findUnique({
+    where: { id: memberId },
+  })
+
+  if (!member) redirect("/login")
+  return member
+}
+
+export async function updateMyProfile(_prevState: unknown, formData: FormData) {
+  const memberId = await getMyMemberId()
+
+  const raw: Record<string, unknown> = {
+    mobileNumber: formData.get("mobileNumber") ?? "",
+    membershipNumber: formData.get("membershipNumber") ?? "",
+    presentDesignation: formData.get("presentDesignation") ?? "",
+    memberOfJAA: formData.get("memberOfJAA") === "true",
+    memberOfAKBJAF: formData.get("memberOfAKBJAF") === "true",
+    pmjjby: formData.get("pmjjby") === "true",
+    pmjjbyDetails: formData.get("pmjjbyDetails") ?? "",
+    pmsby: formData.get("pmsby") === "true",
+    pmsbyDetails: formData.get("pmsbyDetails") ?? "",
+    bloodGroup: formData.get("bloodGroup") ?? "",
+    branchAddress: formData.get("branchAddress") ?? "",
+    homeAddress: formData.get("homeAddress") ?? "",
+    photoUrl: formData.get("photoUrl") ?? "",
+  }
+
+  const dateOfBirth = formData.get("dateOfBirth")
+  if (dateOfBirth && String(dateOfBirth).trim() !== "") raw.dateOfBirth = dateOfBirth
+
+  const dateOfAssociation = formData.get("dateOfAssociation")
+  if (dateOfAssociation && String(dateOfAssociation).trim() !== "") raw.dateOfAssociation = dateOfAssociation
+
+  const parsed = memberProfileSchema.safeParse(raw)
+
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors }
+  }
+
+  await db.member.update({
+    where: { id: memberId },
+    data: parsed.data,
+  })
+
+  revalidatePath("/portal")
+  revalidatePath("/portal/profile")
+  return { success: true }
 }
 
 export async function getMyPayments() {

@@ -41,6 +41,7 @@ type Fund = {
   name: string
   type: "FIXED" | "OPEN"
   amount: number | null
+  yearlyAmount: number | null
 }
 
 type Entry = {
@@ -78,7 +79,7 @@ export function BatchReceiptForm({
   }
 
   const getDefaultNarration = (fund?: Fund) => {
-    return fund?.name ?? "Monthly contribution"
+    return fund?.name ?? "Contribution"
   }
 
   const [entries, setEntries] = useState<Entry[]>(
@@ -124,9 +125,10 @@ export function BatchReceiptForm({
 
     setIsPending(true)
     try {
+      const isYearly = selectedFund?.yearlyAmount != null
       const result = await createBatchReceipts({
         date: date.toISOString(),
-        forMonth,
+        forMonth: isYearly ? undefined : forMonth,
         fundId,
         entries: selectedEntries.map((e) => ({
           memberId: e.memberId,
@@ -180,6 +182,7 @@ export function BatchReceiptForm({
               </PopoverContent>
             </Popover>
           </div>
+          {!(selectedFund?.yearlyAmount != null) && (
           <div className="space-y-2">
             <Label>For Month</Label>
             <Popover open={monthOpen} onOpenChange={setMonthOpen}>
@@ -238,6 +241,7 @@ export function BatchReceiptForm({
               </PopoverContent>
             </Popover>
           </div>
+          )}
           <div className="space-y-2">
             <Label>Fund</Label>
             <Select value={fundId} onValueChange={(v) => v && handleFundChange(v)}>

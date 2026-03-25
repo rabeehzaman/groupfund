@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { DatePicker } from "@/components/date-picker"
 import { createFund, updateFund } from "@/lib/actions/funds"
 
 type Fund = {
@@ -21,11 +22,13 @@ type Fund = {
   name: string
   type: "FIXED" | "OPEN"
   amount: number | null
+  yearlyAmount: number | null
   goalAmount: number | null
   description: string
   purpose: string
   isRecurring: boolean
   isDefault: boolean
+  startDate: Date | null
 }
 
 export function FundForm({ fund }: { fund?: Fund }) {
@@ -48,7 +51,7 @@ export function FundForm({ fund }: { fund?: Fund }) {
               id="name"
               name="name"
               defaultValue={fund?.name}
-              placeholder="e.g. Monthly Contribution, Onam Party Fund"
+              placeholder="e.g. Yearly Contribution, Onam Party Fund"
               required
             />
             {state?.error?.name && (
@@ -91,20 +94,23 @@ export function FundForm({ fund }: { fund?: Fund }) {
 
           {type === "FIXED" && (
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount per Member *</Label>
+              <Label htmlFor="yearlyAmount">Yearly Amount per Member *</Label>
               <Input
-                id="amount"
-                name="amount"
+                id="yearlyAmount"
+                name="yearlyAmount"
                 type="number"
                 min="0"
                 step="0.01"
-                defaultValue={fund?.amount ?? ""}
-                placeholder="Enter amount"
+                defaultValue={fund?.yearlyAmount ?? ""}
+                placeholder="e.g. 3000"
                 required
               />
-              {state?.error?.amount && (
+              <p className="text-muted-foreground text-xs">
+                Total amount expected from each member per year. Members can pay in any installments.
+              </p>
+              {state?.error?.yearlyAmount && (
                 <p className="text-destructive text-sm">
-                  {state.error.amount[0]}
+                  {state.error.yearlyAmount[0]}
                 </p>
               )}
             </div>
@@ -149,14 +155,25 @@ export function FundForm({ fund }: { fund?: Fund }) {
             >
               <SelectTrigger className="w-full">
                 <SelectValue>
-                  {isRecurring ? "Monthly (recurring)" : "One-time collection"}
+                  {isRecurring ? "Yearly (recurring)" : "One-time collection"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">Monthly (recurring)</SelectItem>
+                <SelectItem value="true">Yearly (recurring)</SelectItem>
                 <SelectItem value="false">One-time collection</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Start Date</Label>
+            <DatePicker
+              name="startDate"
+              defaultValue={fund?.startDate ? new Date(fund.startDate) : undefined}
+            />
+            <p className="text-muted-foreground text-xs">
+              When this fund starts collecting. Pending amounts are calculated from this date.
+            </p>
           </div>
 
           <div className="space-y-2">

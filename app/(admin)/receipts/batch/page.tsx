@@ -26,6 +26,7 @@ export default async function BatchReceiptPage() {
           name: f.name,
           type: f.type,
           amount: f.amount,
+          yearlyAmount: f.yearlyAmount,
         }))}
       />
     </div>

@@ -21,8 +21,7 @@ export async function GET(request: NextRequest) {
     "Total Paid": m.totalPaid,
     "Expected Total": m.expectedTotal,
     "Pending Amount": Math.max(0, m.pendingAmount),
-    "Months Paid": m.monthsPaid,
-    "Pending Months": Math.max(0, m.pendingMonths),
+    Payments: m.paymentsCount,
   }))
 
   if (format === "csv") {
@@ -42,7 +41,7 @@ export async function GET(request: NextRequest) {
       "Total Paid",
       "Expected",
       "Pending",
-      "Months Paid",
+      "Payments",
     ]
     const rows = data.map((d) => [
       d.Member,
@@ -50,7 +49,7 @@ export async function GET(request: NextRequest) {
       String(d["Total Paid"]),
       String(d["Expected Total"]),
       String(d["Pending Amount"]),
-      String(d["Months Paid"]),
+      String(d.Payments),
     ])
     const pdf = generatePDF("Member-wise Report", headers, rows)
     return new Response(pdf, {

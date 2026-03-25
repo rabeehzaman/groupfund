@@ -1,90 +1,113 @@
 "use server"
 
 import { db } from "@/lib/db"
-import { getCurrentMonthKey, getMonthsBetween } from "@/lib/format"
 import { requireAuth } from "@/lib/auth-utils"
 
 export type Defaulter = {
   id: string
   name: string
   branch: string
-  consecutiveUnpaid: number
+  pendingAmount: number
   severity: "yellow" | "orange" | "red"
-  lastPaidMonth: string | null
+  totalPaid: number
+  expectedTotal: number
 }
 
-export async function getDefaulters(): Promise<Defaulter[]> {
+function getSeverity(totalPaid: number, expectedTotal: number): "yellow" | "orange" | "red" {
+  if (expectedTotal <= 0) return "yellow"
+  const paidPercent = (totalPaid / expectedTotal) * 100
+  if (paidPercent < 25) return "red"
+  if (paidPercent < 50) return "orange"
+  return "yellow"
+}
+
+export async function getDefaulters(fundId?: string): Promise<Defaulter[]> {
   await requireAuth()
-  const now = new Date()
-  const currentMonth = getCurrentMonthKey()
+
+  // Get the target fund (or default fund)
+  let fund = fundId
+    ? await db.fund.findUnique({ where: { id: fundId } })
+    : await db.fund.findFirst({ where: { isDefault: true } })
+
+  if (!fund) {
+    fund = await db.fund.findFirst({ where: { isActive: true } })
+  }
+  if (!fund || fund.type === "OPEN") return []
+
+  const fundStartDate = new Date(fund.startDate ?? fund.createdAt)
+  const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
+  if (yearlyAmount <= 0) return []
 
   const members = await db.member.findMany({
     where: { isActive: true },
     include: {
       receipts: {
-        select: { forMonth: true },
-        orderBy: { forMonth: "desc" },
+        where: { fundId: fund.id },
+        select: { amount: true },
       },
     },
   })
 
   return members
     .map((member) => {
-      const paidMonths = new Set(member.receipts.map((r) => r.forMonth))
-      let consecutive = 0
-      const checkMonths = getMonthsBetween(member.joinDate, now).reverse()
-
-      for (const month of checkMonths) {
-        if (month > currentMonth) continue
-        if (paidMonths.has(month)) break
-        consecutive++
+      const joinDate = new Date(member.joinDate)
+      // Only count from the later of joinDate or fundStartDate
+      if (joinDate > new Date() || fundStartDate > new Date()) {
+        return null
       }
 
-      let severity: "yellow" | "orange" | "red" = "yellow"
-      if (consecutive >= 6) severity = "red"
-      else if (consecutive >= 3) severity = "orange"
+      const totalPaid = member.receipts.reduce((sum, r) => sum + r.amount, 0)
+      const expectedTotal = yearlyAmount
+      const pendingAmount = expectedTotal - totalPaid
+
+      if (pendingAmount <= 0) return null
 
       return {
         id: member.id,
         name: member.name,
         branch: member.branch,
-        consecutiveUnpaid: consecutive,
-        severity,
-        lastPaidMonth: member.receipts[0]?.forMonth ?? null,
+        pendingAmount,
+        totalPaid,
+        expectedTotal,
+        severity: getSeverity(totalPaid, expectedTotal),
       }
     })
-    .filter((m) => m.consecutiveUnpaid > 0)
-    .sort((a, b) => b.consecutiveUnpaid - a.consecutiveUnpaid)
+    .filter((m): m is Defaulter => m !== null)
+    .sort((a, b) => b.pendingAmount - a.pendingAmount)
 }
 
-export async function getDefaulterStatus(memberId: string) {
-  const now = new Date()
-  const currentMonth = getCurrentMonthKey()
+export async function getDefaulterStatus(memberId: string, fundId?: string) {
+  let fund = fundId
+    ? await db.fund.findUnique({ where: { id: fundId } })
+    : await db.fund.findFirst({ where: { isDefault: true } })
+
+  if (!fund) {
+    fund = await db.fund.findFirst({ where: { isActive: true } })
+  }
+  if (!fund || fund.type === "OPEN") return null
+
+  const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
+  if (yearlyAmount <= 0) return null
 
   const member = await db.member.findUnique({
     where: { id: memberId },
     include: {
-      receipts: { select: { forMonth: true }, orderBy: { forMonth: "desc" } },
+      receipts: {
+        where: { fundId: fund.id },
+        select: { amount: true },
+      },
     },
   })
 
   if (!member) return null
 
-  const paidMonths = new Set(member.receipts.map((r) => r.forMonth))
-  let consecutive = 0
-  const checkMonths = getMonthsBetween(member.joinDate, now).reverse()
+  const totalPaid = member.receipts.reduce((sum, r) => sum + r.amount, 0)
+  const pendingAmount = yearlyAmount - totalPaid
 
-  for (const month of checkMonths) {
-    if (month > currentMonth) continue
-    if (paidMonths.has(month)) break
-    consecutive++
+  if (pendingAmount <= 0) return null
+
+  return {
+    pendingAmount,
+    severity: getSeverity(totalPaid, yearlyAmount),
   }
-
-  if (consecutive === 0) return null
-
-  let severity: "yellow" | "orange" | "red" = "yellow"
-  if (consecutive >= 6) severity = "red"
-  else if (consecutive >= 3) severity = "orange"
-
-  return { consecutiveUnpaid: consecutive, severity }
 }

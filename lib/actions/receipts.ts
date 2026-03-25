@@ -43,10 +43,11 @@ export async function createReceipt(_prevState: unknown, formData: FormData) {
     fundId = defaultFund.id
   }
 
+  const forMonth = formData.get("forMonth") as string | null
   const parsed = receiptSchema.safeParse({
     date: formData.get("date"),
     amount: formData.get("amount"),
-    forMonth: formData.get("forMonth"),
+    forMonth: forMonth || undefined,
     narration: formData.get("narration"),
     memberId: formData.get("memberId"),
     fundId,
@@ -56,7 +57,12 @@ export async function createReceipt(_prevState: unknown, formData: FormData) {
     return { error: parsed.error.flatten().fieldErrors }
   }
 
-  await db.receipt.create({ data: parsed.data })
+  await db.receipt.create({
+    data: {
+      ...parsed.data,
+      forMonth: parsed.data.forMonth || null,
+    },
+  })
   revalidatePath("/receipts")
   revalidatePath("/dashboard")
   revalidatePath(`/members/${parsed.data.memberId}`)
@@ -76,10 +82,11 @@ export async function updateReceipt(id: string, _prevState: unknown, formData: F
     }
   }
 
+  const forMonth = formData.get("forMonth") as string | null
   const parsed = receiptSchema.safeParse({
     date: formData.get("date"),
     amount: formData.get("amount"),
-    forMonth: formData.get("forMonth"),
+    forMonth: forMonth || undefined,
     narration: formData.get("narration"),
     memberId: formData.get("memberId"),
     fundId,
@@ -89,7 +96,13 @@ export async function updateReceipt(id: string, _prevState: unknown, formData: F
     return { error: parsed.error.flatten().fieldErrors }
   }
 
-  await db.receipt.update({ where: { id }, data: parsed.data })
+  await db.receipt.update({
+    where: { id },
+    data: {
+      ...parsed.data,
+      forMonth: parsed.data.forMonth || null,
+    },
+  })
   revalidatePath("/receipts")
   revalidatePath("/dashboard")
   redirect("/receipts")
@@ -112,7 +125,7 @@ export async function updateReceiptStatus(id: string, status: "VERIFIED" | "REJE
 
 export async function createBatchReceipts(data: {
   date: string
-  forMonth: string
+  forMonth?: string
   fundId?: string
   entries: { memberId: string; amount: number; narration: string }[]
 }) {
@@ -125,7 +138,7 @@ export async function createBatchReceipts(data: {
 
   const receipts = data.entries.map((entry) => ({
     date: new Date(data.date),
-    forMonth: data.forMonth,
+    forMonth: data.forMonth || null,
     fundId,
     amount: entry.amount,
     narration: entry.narration,

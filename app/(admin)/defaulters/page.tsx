@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getDefaulters } from "@/lib/actions/defaulters"
-import { formatMonthYear } from "@/lib/format"
+import { formatCurrency } from "@/lib/format"
 import { DefaulterBadge } from "@/components/defaulter-badge"
 
 export default async function DefaultersPage() {
@@ -23,7 +23,7 @@ export default async function DefaultersPage() {
           Defaulters
         </h1>
         <p className="text-muted-foreground mt-1">
-          Members with consecutive unpaid months.
+          Members with pending payments.
         </p>
       </div>
 
@@ -54,10 +54,11 @@ export default async function DefaultersPage() {
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Branch</TableHead>
-                    <TableHead className="text-center">
-                      Months Overdue
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Expected</TableHead>
+                    <TableHead className="text-right">
+                      Pending
                     </TableHead>
-                    <TableHead>Last Paid</TableHead>
                     <TableHead className="text-center">Severity</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -75,17 +76,18 @@ export default async function DefaultersPage() {
                       <TableCell className="text-muted-foreground">
                         {d.branch || "-"}
                       </TableCell>
-                      <TableCell className="text-center font-semibold">
-                        {d.consecutiveUnpaid}
+                      <TableCell className="text-right text-emerald-600 font-medium tabular-nums">
+                        {formatCurrency(d.totalPaid)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {d.lastPaidMonth
-                          ? formatMonthYear(d.lastPaidMonth)
-                          : "Never"}
+                      <TableCell className="text-right text-muted-foreground tabular-nums">
+                        {formatCurrency(d.expectedTotal)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-red-500 tabular-nums">
+                        {formatCurrency(d.pendingAmount)}
                       </TableCell>
                       <TableCell className="text-center">
                         <DefaulterBadge
-                          months={d.consecutiveUnpaid}
+                          pendingAmount={d.pendingAmount}
                           severity={d.severity}
                         />
                       </TableCell>

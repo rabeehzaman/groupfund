@@ -8,7 +8,7 @@ export type ReceiptRow = {
   id: string
   date: Date
   amount: number
-  forMonth: string
+  forMonth: string | null
   narration: string
   status: "PENDING" | "VERIFIED" | "REJECTED"
   proofUrl: string | null
@@ -47,7 +47,10 @@ export const columns: ColumnDef<ReceiptRow>[] = [
   {
     accessorKey: "forMonth",
     header: "For Month",
-    cell: ({ row }) => formatMonthYear(row.getValue("forMonth")),
+    cell: ({ row }) => {
+      const forMonth = row.getValue("forMonth") as string | null
+      return forMonth ? formatMonthYear(forMonth) : "-"
+    },
   },
   {
     accessorKey: "amount",

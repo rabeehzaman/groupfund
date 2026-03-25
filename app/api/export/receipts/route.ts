@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     Member: r.member.name,
     Branch: r.member.branch || "",
     Fund: r.fund.name,
-    "For Month": r.forMonth,
+    "For Month": r.forMonth || "-",
     Amount: r.amount,
     Status: r.status,
     Narration: r.narration || "",

@@ -5,7 +5,6 @@ type CollectionRateData = {
   paidCount: number
   totalActive: number
   rate: number
-  month: string
 }
 
 export function CollectionRateCard({ data }: { data: CollectionRateData }) {
@@ -38,7 +37,7 @@ export function CollectionRateCard({ data }: { data: CollectionRateData }) {
           {Math.round(data.rate)}%
         </p>
         <p className="text-muted-foreground mt-1 text-sm">
-          {data.paidCount} of {data.totalActive} members paid this month
+          {data.paidCount} of {data.totalActive} members fully paid
         </p>
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
           <div

@@ -5,6 +5,10 @@ export const settingsSchema = z.object({
   defaultMonthlyAmount: z.coerce
     .number()
     .min(0, "Amount must be positive"),
+  defaultYearlyAmount: z.coerce
+    .number()
+    .min(0, "Amount must be positive")
+    .default(3000),
   financialYearStart: z.coerce.number().min(1).max(12),
 })
 

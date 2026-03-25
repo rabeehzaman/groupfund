@@ -47,9 +47,15 @@ export async function createFund(
   const amount = formData.get("amount")
   if (amount && String(amount).trim() !== "") raw.amount = amount
 
+  const yearlyAmount = formData.get("yearlyAmount")
+  if (yearlyAmount && String(yearlyAmount).trim() !== "") raw.yearlyAmount = yearlyAmount
+
   const goalAmount = formData.get("goalAmount")
   if (goalAmount && String(goalAmount).trim() !== "")
     raw.goalAmount = goalAmount
+
+  const startDate = formData.get("startDate")
+  if (startDate && String(startDate).trim() !== "") raw.startDate = startDate
 
   const parsed = fundSchema.safeParse(raw)
 
@@ -61,19 +67,23 @@ export async function createFund(
     name: string
     type: "FIXED" | "OPEN"
     amount: number | null
+    yearlyAmount: number | null
     goalAmount: number | null
     description: string
     purpose: string
     isRecurring: boolean
+    startDate: Date | null
   } = {
     name: parsed.data.name,
     type: parsed.data.type,
     amount: parsed.data.type === "FIXED" ? (parsed.data.amount ?? null) : null,
+    yearlyAmount: parsed.data.type === "FIXED" ? (parsed.data.yearlyAmount ?? null) : null,
     goalAmount:
       parsed.data.type === "OPEN" ? (parsed.data.goalAmount ?? null) : null,
     description: parsed.data.description ?? "",
     purpose: parsed.data.purpose ?? "",
     isRecurring: parsed.data.isRecurring ?? true,
+    startDate: parsed.data.startDate ?? null,
   }
 
   await db.fund.create({ data })
@@ -101,9 +111,15 @@ export async function updateFund(
   const amount = formData.get("amount")
   if (amount && String(amount).trim() !== "") raw.amount = amount
 
+  const yearlyAmount = formData.get("yearlyAmount")
+  if (yearlyAmount && String(yearlyAmount).trim() !== "") raw.yearlyAmount = yearlyAmount
+
   const goalAmount = formData.get("goalAmount")
   if (goalAmount && String(goalAmount).trim() !== "")
     raw.goalAmount = goalAmount
+
+  const startDate = formData.get("startDate")
+  if (startDate && String(startDate).trim() !== "") raw.startDate = startDate
 
   const parsed = fundSchema.safeParse(raw)
 
@@ -115,19 +131,23 @@ export async function updateFund(
     name: string
     type: "FIXED" | "OPEN"
     amount: number | null
+    yearlyAmount: number | null
     goalAmount: number | null
     description: string
     purpose: string
     isRecurring: boolean
+    startDate: Date | null
   } = {
     name: parsed.data.name,
     type: parsed.data.type,
     amount: parsed.data.type === "FIXED" ? (parsed.data.amount ?? null) : null,
+    yearlyAmount: parsed.data.type === "FIXED" ? (parsed.data.yearlyAmount ?? null) : null,
     goalAmount:
       parsed.data.type === "OPEN" ? (parsed.data.goalAmount ?? null) : null,
     description: parsed.data.description ?? "",
     purpose: parsed.data.purpose ?? "",
     isRecurring: parsed.data.isRecurring ?? true,
+    startDate: parsed.data.startDate ?? null,
   }
 
   await db.fund.update({ where: { id }, data })

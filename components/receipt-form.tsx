@@ -23,7 +23,7 @@ type Receipt = {
   id: string
   date: Date
   amount: number
-  forMonth: string
+  forMonth: string | null
   narration: string
   memberId: string
   fundId: string
@@ -35,6 +35,7 @@ type Fund = {
   name: string
   type: "FIXED" | "OPEN"
   amount: number | null
+  yearlyAmount: number | null
 }
 
 export function ReceiptForm({
@@ -56,6 +57,7 @@ export function ReceiptForm({
   const [memberId, setMemberId] = useState(receipt?.memberId ?? defaultMemberId ?? "")
   const [fundId, setFundId] = useState(receipt?.fundId ?? (funds.length === 1 ? funds[0].id : ""))
   const selectedFund = funds.find((f) => f.id === fundId)
+  const isYearlyFund = selectedFund?.yearlyAmount != null
 
   return (
     <Card className="max-w-lg">
@@ -132,7 +134,7 @@ export function ReceiptForm({
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className={`grid grid-cols-1 gap-4 ${isYearlyFund ? "" : "sm:grid-cols-2"}`}>
             <div className="space-y-2">
               <Label>Date *</Label>
               <DatePicker
@@ -141,13 +143,15 @@ export function ReceiptForm({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>For Month *</Label>
-              <MonthPicker
-                name="forMonth"
-                defaultValue={receipt?.forMonth || getCurrentMonthKey()}
-              />
-            </div>
+            {!isYearlyFund && (
+              <div className="space-y-2">
+                <Label>For Month</Label>
+                <MonthPicker
+                  name="forMonth"
+                  defaultValue={receipt?.forMonth || getCurrentMonthKey()}
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -158,15 +162,17 @@ export function ReceiptForm({
               type="number"
               min="0"
               step="0.01"
-              defaultValue={
-                receipt?.amount ??
-                (selectedFund?.type === "FIXED" && selectedFund.amount
-                  ? selectedFund.amount
-                  : "")
-              }
+              defaultValue={receipt?.amount ?? ""}
               key={fundId}
+              placeholder="Enter any amount"
               required
             />
+            {selectedFund?.yearlyAmount && (
+              <p className="text-muted-foreground text-xs">
+                Yearly target: {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0 }).format(selectedFund.yearlyAmount)}.
+                Member can pay any amount at any time.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

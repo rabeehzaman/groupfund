@@ -38,7 +38,7 @@ export default async function MyPaymentsPage() {
                 >
                   <div>
                     <p className="font-medium">
-                      {formatMonthYear(receipt.forMonth)}
+                      {receipt.forMonth ? formatMonthYear(receipt.forMonth) : formatDate(receipt.date)}
                     </p>
                     <p className="text-muted-foreground text-xs">
                       {receipt.fund.name} &middot; {formatDate(receipt.date)}

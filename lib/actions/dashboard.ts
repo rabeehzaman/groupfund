@@ -1,7 +1,6 @@
 "use server"
 
 import { db } from "@/lib/db"
-import { getCurrentMonthKey } from "@/lib/format"
 
 function buildDateFilter(from?: string, to?: string) {
   const where: { date?: { gte?: Date; lte?: Date } } = {}
@@ -88,15 +87,37 @@ export async function getRecentActivity(from?: string, to?: string) {
 }
 
 export async function getCollectionRate() {
-  const month = getCurrentMonthKey()
-  const [totalActive, paidMembers] = await Promise.all([
+  const [totalActive, defaultFund] = await Promise.all([
     db.member.count({ where: { isActive: true } }),
-    db.receipt.groupBy({
-      by: ["memberId"],
-      where: { forMonth: month },
-    }),
+    db.fund.findFirst({ where: { isDefault: true } }),
   ])
-  const paidCount = paidMembers.length
+
+  if (!defaultFund) {
+    return { paidCount: 0, totalActive, rate: 0 }
+  }
+
+  const yearlyAmount = defaultFund.yearlyAmount ?? (defaultFund.amount ? defaultFund.amount * 12 : 0)
+
+  if (yearlyAmount <= 0) {
+    return { paidCount: 0, totalActive, rate: 0 }
+  }
+
+  // Count members who have fully paid their yearly amount for this fund
+  const members = await db.member.findMany({
+    where: { isActive: true },
+    include: {
+      receipts: {
+        where: { fundId: defaultFund.id },
+        select: { amount: true },
+      },
+    },
+  })
+
+  const paidCount = members.filter((m) => {
+    const totalPaid = m.receipts.reduce((sum, r) => sum + r.amount, 0)
+    return totalPaid >= yearlyAmount
+  }).length
+
   const rate = totalActive > 0 ? (paidCount / totalActive) * 100 : 0
-  return { paidCount, totalActive, rate, month }
+  return { paidCount, totalActive, rate }
 }

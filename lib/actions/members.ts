@@ -42,23 +42,68 @@ export async function getMemberWithStats(id: string) {
   if (!member) return null
 
   const totalPaid = member.receipts.reduce((sum, r) => sum + r.amount, 0)
-  const monthsPaid = new Set(member.receipts.map((r) => r.forMonth)).size
 
   return {
     ...member,
     totalPaid,
-    monthsPaid,
     paymentsCount: member.receipts.length,
   }
 }
 
+function extractProfileFields(formData: FormData) {
+  const fields: Record<string, unknown> = {}
+
+  const mobileNumber = formData.get("mobileNumber")
+  if (mobileNumber !== null) fields.mobileNumber = mobileNumber
+
+  const membershipNumber = formData.get("membershipNumber")
+  if (membershipNumber !== null) fields.membershipNumber = membershipNumber
+
+  const dateOfBirth = formData.get("dateOfBirth")
+  if (dateOfBirth && String(dateOfBirth).trim() !== "") fields.dateOfBirth = dateOfBirth
+
+  const dateOfAssociation = formData.get("dateOfAssociation")
+  if (dateOfAssociation && String(dateOfAssociation).trim() !== "") fields.dateOfAssociation = dateOfAssociation
+
+  fields.memberOfJAA = formData.get("memberOfJAA") === "true"
+  fields.memberOfAKBJAF = formData.get("memberOfAKBJAF") === "true"
+
+  const presentDesignation = formData.get("presentDesignation")
+  if (presentDesignation !== null) fields.presentDesignation = presentDesignation
+
+  fields.pmjjby = formData.get("pmjjby") === "true"
+  const pmjjbyDetails = formData.get("pmjjbyDetails")
+  if (pmjjbyDetails !== null) fields.pmjjbyDetails = pmjjbyDetails
+
+  fields.pmsby = formData.get("pmsby") === "true"
+  const pmsbyDetails = formData.get("pmsbyDetails")
+  if (pmsbyDetails !== null) fields.pmsbyDetails = pmsbyDetails
+
+  const bloodGroup = formData.get("bloodGroup")
+  if (bloodGroup !== null) fields.bloodGroup = bloodGroup
+
+  const branchAddress = formData.get("branchAddress")
+  if (branchAddress !== null) fields.branchAddress = branchAddress
+
+  const homeAddress = formData.get("homeAddress")
+  if (homeAddress !== null) fields.homeAddress = homeAddress
+
+  const photoUrl = formData.get("photoUrl")
+  if (photoUrl !== null) fields.photoUrl = photoUrl
+
+  return fields
+}
+
 export async function createMember(_prevState: unknown, formData: FormData) {
   await requireAdmin()
-  const parsed = memberSchema.safeParse({
+  const raw = {
     name: formData.get("name"),
     branch: formData.get("branch"),
     monthlyAmount: formData.get("monthlyAmount"),
-  })
+    ...extractProfileFields(formData),
+  }
+
+  const parsed = memberSchema.safeParse(raw)
 
   if (!parsed.success) {
     return { error: parsed.error.flatten().fieldErrors }
@@ -91,12 +136,15 @@ export async function createMember(_prevState: unknown, formData: FormData) {
 
 export async function updateMember(id: string, _prevState: unknown, formData: FormData) {
   await requireAdmin()
-  const parsed = memberSchema.safeParse({
+  const raw = {
     name: formData.get("name"),
     branch: formData.get("branch"),
     monthlyAmount: formData.get("monthlyAmount"),
     isActive: formData.get("isActive") === "true",
-  })
+    ...extractProfileFields(formData),
+  }
+
+  const parsed = memberSchema.safeParse(raw)
 
   if (!parsed.success) {
     return { error: parsed.error.flatten().fieldErrors }

@@ -2,11 +2,12 @@
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import { MONTH_SHORT } from "@/lib/constants"
 import { formatCurrency } from "@/lib/format"
 
 type Receipt = {
-  forMonth: string
+  forMonth: string | null
   amount: number
 }
 
@@ -16,6 +17,8 @@ type Props = {
   joinDate: Date
   fundType?: "FIXED" | "OPEN"
   title?: string
+  fundStartDate?: Date
+  yearlyAmount?: number | null
 }
 
 export function PaymentGrid({
@@ -24,16 +27,70 @@ export function PaymentGrid({
   joinDate,
   fundType = "FIXED",
   title = "Payment Grid",
+  fundStartDate,
+  yearlyAmount,
 }: Props) {
-  // Build a map of month -> total paid
-  const paidMap = new Map<string, number>()
-  for (const r of receipts) {
-    paidMap.set(r.forMonth, (paidMap.get(r.forMonth) || 0) + r.amount)
+  // If the fund has a yearly amount, show a simple progress view
+  if (yearlyAmount && yearlyAmount > 0) {
+    const totalPaid = receipts.reduce((sum, r) => sum + r.amount, 0)
+    const pendingAmount = Math.max(0, yearlyAmount - totalPaid)
+    const progress = Math.min((totalPaid / yearlyAmount) * 100, 100)
+    const isPaid = totalPaid >= yearlyAmount
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium">{Math.round(progress)}%</span>
+            </div>
+            <Progress value={progress} className="h-3" />
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-muted-foreground text-xs">Expected</p>
+              <p className="text-lg font-semibold">{formatCurrency(yearlyAmount)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Paid</p>
+              <p className="text-lg font-semibold text-emerald-600">{formatCurrency(totalPaid)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Pending</p>
+              <p className={`text-lg font-semibold ${isPaid ? "text-emerald-600" : "text-red-500"}`}>
+                {isPaid ? "Paid" : formatCurrency(pendingAmount)}
+              </p>
+            </div>
+          </div>
+          {receipts.length > 0 && (
+            <div className="text-muted-foreground text-xs text-center">
+              {receipts.length} payment{receipts.length !== 1 ? "s" : ""} made
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    )
   }
 
-  // Get all years from joinDate to now
-  const startYear = new Date(joinDate).getFullYear()
-  const startMonth = new Date(joinDate).getMonth()
+  // Legacy monthly grid view
+  const paidMap = new Map<string, number>()
+  for (const r of receipts) {
+    if (r.forMonth) {
+      paidMap.set(r.forMonth, (paidMap.get(r.forMonth) || 0) + r.amount)
+    }
+  }
+
+  // Use the later of joinDate and fundStartDate as the grid start
+  const effectiveStart = fundStartDate && new Date(fundStartDate) > new Date(joinDate)
+    ? new Date(fundStartDate)
+    : new Date(joinDate)
+
+  const startYear = effectiveStart.getFullYear()
+  const startMonth = effectiveStart.getMonth()
   const now = new Date()
   const endYear = now.getFullYear()
   const endMonth = now.getMonth()

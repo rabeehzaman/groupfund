@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { Bell } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -11,17 +10,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getPendingMembers, generateReminderText } from "@/lib/actions/reminders"
-import { formatCurrency, formatMonthYear } from "@/lib/format"
+import { formatCurrency } from "@/lib/format"
 import { ReminderMessage } from "@/components/reminder-message"
 
-export default async function RemindersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ month?: string }>
-}) {
-  const { month } = await searchParams
-  const data = await getPendingMembers(month)
-  const reminderText = await generateReminderText(data.month)
+export default async function RemindersPage() {
+  const data = await getPendingMembers()
+  const reminderText = await generateReminderText()
 
   return (
     <div className="space-y-6">
@@ -30,7 +24,7 @@ export default async function RemindersPage({
           Payment Reminders
         </h1>
         <p className="text-muted-foreground mt-1">
-          Members with pending payments for {formatMonthYear(data.month)}.
+          Members with pending payments{data.fundName ? ` for ${data.fundName}` : ""}.
         </p>
       </div>
 
@@ -45,7 +39,7 @@ export default async function RemindersPage({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Paid</CardTitle>
+            <CardTitle className="text-sm font-medium">Fully Paid</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-emerald-600">{data.paid}</p>
@@ -70,7 +64,7 @@ export default async function RemindersPage({
               <Bell className="size-6 text-emerald-600" />
             </div>
             <p className="text-muted-foreground text-sm">
-              All members have paid for {formatMonthYear(data.month)}!
+              All members have fully paid!
             </p>
           </CardContent>
         </Card>
@@ -91,7 +85,8 @@ export default async function RemindersPage({
                       <TableHead>#</TableHead>
                       <TableHead>Member</TableHead>
                       <TableHead>Branch</TableHead>
-                      <TableHead className="text-right">Amount Due</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                      <TableHead className="text-right">Pending</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -111,8 +106,11 @@ export default async function RemindersPage({
                         <TableCell className="text-muted-foreground">
                           {m.branch || "-"}
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatCurrency(m.monthlyAmount)}
+                        <TableCell className="text-right text-emerald-600 tabular-nums">
+                          {formatCurrency(m.totalPaid)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-red-500 tabular-nums">
+                          {formatCurrency(m.pendingAmount)}
                         </TableCell>
                       </TableRow>
                     ))}

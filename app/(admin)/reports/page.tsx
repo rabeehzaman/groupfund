@@ -109,17 +109,13 @@ export default async function ReportsPage({
                               {formatCurrency(Math.max(0, m.pendingAmount))}
                             </TableCell>
                             <TableCell className="text-center">
-                              {m.pendingMonths <= 0 ? (
+                              {m.pendingAmount <= 0 ? (
                                 <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
                                   Paid
                                 </Badge>
-                              ) : m.pendingMonths <= 2 ? (
-                                <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                  {m.pendingMonths}m pending
-                                </Badge>
                               ) : (
                                 <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                  {m.pendingMonths}m overdue
+                                  {formatCurrency(m.pendingAmount)} pending
                                 </Badge>
                               )}
                             </TableCell>

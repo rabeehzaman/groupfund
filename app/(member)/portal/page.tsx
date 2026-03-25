@@ -8,7 +8,7 @@ import { formatCurrency, formatMonthYear, formatDate } from "@/lib/format"
 import { PaymentGrid } from "@/components/payment-grid"
 
 export default async function MemberPortalPage() {
-  const [{ member, totalPaid, monthsPaid }, funds] = await Promise.all([
+  const [{ member, totalPaid, paymentsCount }, funds] = await Promise.all([
     getMyDashboard(),
     getActiveFunds(),
   ])
@@ -17,7 +17,7 @@ export default async function MemberPortalPage() {
   const receiptsByFund = new Map<
     string,
     {
-      fund: { id: string; name: string; type: "FIXED" | "OPEN"; amount: number | null }
+      fund: { id: string; name: string; type: "FIXED" | "OPEN"; amount: number | null; yearlyAmount?: number | null; startDate?: Date | null; createdAt?: Date }
       receipts: typeof member.receipts
     }
   >()
@@ -32,9 +32,12 @@ export default async function MemberPortalPage() {
   for (const fund of funds) {
     if (!receiptsByFund.has(fund.id)) {
       receiptsByFund.set(fund.id, {
-        fund: { id: fund.id, name: fund.name, type: fund.type, amount: fund.amount },
+        fund: { id: fund.id, name: fund.name, type: fund.type, amount: fund.amount, yearlyAmount: fund.yearlyAmount, startDate: fund.startDate, createdAt: fund.createdAt },
         receipts: [],
       })
+    } else {
+      const entry = receiptsByFund.get(fund.id)!
+      entry.fund = { ...entry.fund, yearlyAmount: fund.yearlyAmount, startDate: fund.startDate, createdAt: fund.createdAt }
     }
   }
 
@@ -71,13 +74,13 @@ export default async function MemberPortalPage() {
 
         <Card className="transition-card hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Months Paid</CardTitle>
+            <CardTitle className="text-sm font-medium">Payments</CardTitle>
             <div className="flex size-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950">
               <CalendarCheck className="size-4 text-blue-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{monthsPaid}</p>
+            <p className="text-2xl font-bold">{paymentsCount}</p>
           </CardContent>
         </Card>
 
@@ -125,6 +128,8 @@ export default async function MemberPortalPage() {
                 joinDate={member.joinDate}
                 fundType={entry.fund.type}
                 title={`${entry.fund.name} Grid`}
+                fundStartDate={entry.fund.startDate ?? entry.fund.createdAt ?? undefined}
+                yearlyAmount={entry.fund.yearlyAmount}
               />
 
               <Card>
@@ -145,7 +150,9 @@ export default async function MemberPortalPage() {
                         >
                           <div>
                             <p className="font-medium">
-                              {formatMonthYear(receipt.forMonth)}
+                              {receipt.forMonth
+                                ? formatMonthYear(receipt.forMonth)
+                                : formatDate(receipt.date)}
                             </p>
                             <p className="text-muted-foreground text-xs">
                               {receipt.narration || "No narration"} &middot;{" "}

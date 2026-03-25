@@ -25,6 +25,7 @@ export async function updateSettings(_prevState: unknown, formData: FormData) {
   const parsed = settingsSchema.safeParse({
     groupName: formData.get("groupName"),
     defaultMonthlyAmount: formData.get("defaultMonthlyAmount"),
+    defaultYearlyAmount: formData.get("defaultYearlyAmount"),
     financialYearStart: formData.get("financialYearStart"),
   })
 

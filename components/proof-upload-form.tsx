@@ -17,7 +17,7 @@ import { formatCurrency, formatMonthYear } from "@/lib/format"
 
 type Receipt = {
   id: string
-  forMonth: string
+  forMonth: string | null
   amount: number
   fundName: string
   proofUrl: string | null
@@ -88,7 +88,7 @@ export function ProofUploadForm({ receipts }: { receipts: Receipt[] }) {
           <SelectContent>
             {receipts.map((r) => (
               <SelectItem key={r.id} value={r.id}>
-                {formatMonthYear(r.forMonth)} - {r.fundName} -{" "}
+                {r.forMonth ? formatMonthYear(r.forMonth) : "Payment"} - {r.fundName} -{" "}
                 {formatCurrency(r.amount)}
                 {r.proofUrl ? " (has proof)" : ""}
               </SelectItem>

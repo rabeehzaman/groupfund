@@ -85,7 +85,7 @@ export function ReceiptsDataTable<TData extends { id: string }, TValue>({
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{receipt.fund.name}</span>
                       <span>&middot;</span>
-                      <span>{formatMonthYear(receipt.forMonth)}</span>
+                      <span>{receipt.forMonth ? formatMonthYear(receipt.forMonth) : "-"}</span>
                       <span>&middot;</span>
                       <span>{formatDate(receipt.date)}</span>
                     </div>
