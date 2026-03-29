@@ -103,20 +103,16 @@ export async function getCollectionRate() {
   }
 
   // Count members who have fully paid their yearly amount for this fund
-  const members = await db.member.findMany({
-    where: { isActive: true },
-    include: {
-      receipts: {
-        where: { fundId: defaultFund.id },
-        select: { amount: true },
-      },
-    },
+  // Use groupBy to aggregate at database level instead of loading all receipts into memory
+  const receiptTotals = await db.receipt.groupBy({
+    by: ["memberId"],
+    where: { fundId: defaultFund.id },
+    _sum: { amount: true },
   })
 
-  const paidCount = members.filter((m) => {
-    const totalPaid = m.receipts.reduce((sum, r) => sum + r.amount, 0)
-    return totalPaid >= yearlyAmount
-  }).length
+  const paidCount = receiptTotals.filter(
+    (r) => (r._sum.amount ?? 0) >= yearlyAmount
+  ).length
 
   const rate = totalActive > 0 ? (paidCount / totalActive) * 100 : 0
   return { paidCount, totalActive, rate }

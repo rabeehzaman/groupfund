@@ -38,15 +38,22 @@ export async function getDefaulters(fundId?: string): Promise<Defaulter[]> {
   const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
   if (yearlyAmount <= 0) return []
 
-  const members = await db.member.findMany({
-    where: { isActive: true },
-    include: {
-      receipts: {
-        where: { fundId: fund.id },
-        select: { amount: true },
-      },
-    },
-  })
+  // Use groupBy for aggregates instead of loading all receipts into memory
+  const [members, receiptTotals] = await Promise.all([
+    db.member.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, branch: true, joinDate: true },
+    }),
+    db.receipt.groupBy({
+      by: ["memberId"],
+      where: { fundId: fund.id },
+      _sum: { amount: true },
+    }),
+  ])
+
+  const paidMap = new Map(
+    receiptTotals.map((r) => [r.memberId, r._sum.amount ?? 0])
+  )
 
   return members
     .map((member) => {
@@ -56,7 +63,7 @@ export async function getDefaulters(fundId?: string): Promise<Defaulter[]> {
         return null
       }
 
-      const totalPaid = member.receipts.reduce((sum, r) => sum + r.amount, 0)
+      const totalPaid = paidMap.get(member.id) ?? 0
       const expectedTotal = yearlyAmount
       const pendingAmount = expectedTotal - totalPaid
 

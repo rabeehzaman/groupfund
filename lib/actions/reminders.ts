@@ -19,20 +19,27 @@ export async function getPendingMembers(fundId?: string) {
 
   const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
 
-  const members = await db.member.findMany({
-    where: { isActive: true },
-    include: {
-      receipts: {
-        where: { fundId: fund.id },
-        select: { amount: true },
-      },
-    },
-    orderBy: { name: "asc" },
-  })
+  // Use groupBy for aggregates instead of loading all receipts into memory
+  const [members, receiptTotals] = await Promise.all([
+    db.member.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, branch: true },
+      orderBy: { name: "asc" },
+    }),
+    db.receipt.groupBy({
+      by: ["memberId"],
+      where: { fundId: fund.id },
+      _sum: { amount: true },
+    }),
+  ])
+
+  const paidMap = new Map(
+    receiptTotals.map((r) => [r.memberId, r._sum.amount ?? 0])
+  )
 
   const pending = members
     .map((m) => {
-      const totalPaid = m.receipts.reduce((sum, r) => sum + r.amount, 0)
+      const totalPaid = paidMap.get(m.id) ?? 0
       const pendingAmount = yearlyAmount - totalPaid
       return {
         id: m.id,

@@ -147,6 +147,16 @@ export function MemberProfileForm({ member }: { member: Member }) {
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Dates</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
+                <Label>Date of Joining</Label>
+                <Input
+                  value={member.joinDate ? new Date(member.joinDate).toLocaleDateString("en-IN", {
+                    day: "2-digit", month: "short", year: "numeric",
+                  }) : "Not set"}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>Date of Birth</Label>
                 <DatePicker
                   name="dateOfBirth"

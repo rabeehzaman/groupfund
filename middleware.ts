@@ -27,8 +27,13 @@ async function getPayload(req: NextRequest) {
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // Public paths
-  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
+  // Auth API routes — always allow, no JWT decode needed
+  if (pathname.startsWith("/api/auth")) {
+    return NextResponse.next()
+  }
+
+  // Login page — redirect to home if already authenticated
+  if (pathname.startsWith("/login")) {
     const payload = await getPayload(req)
     if (payload) {
       return NextResponse.redirect(new URL("/", req.url))

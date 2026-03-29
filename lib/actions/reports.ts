@@ -21,17 +21,26 @@ export async function getMemberWiseReport(from?: string, to?: string, fundId?: s
     if (to) receiptWhere.date.lte = new Date(to + "T23:59:59.999Z")
   }
 
-  const [members, fund, settings] = await Promise.all([
+  // Use groupBy for aggregates instead of loading all receipts into memory
+  const [members, receiptTotals, fund, settings] = await Promise.all([
     db.member.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },
-      include: {
-        receipts: { where: receiptWhere },
-      },
+      select: { id: true, name: true, branch: true, joinDate: true, monthlyAmount: true },
+    }),
+    db.receipt.groupBy({
+      by: ["memberId"],
+      where: receiptWhere,
+      _sum: { amount: true },
+      _count: { _all: true },
     }),
     fundId ? db.fund.findUnique({ where: { id: fundId } }) : null,
     db.settings.findUnique({ where: { id: "default" } }),
   ])
+
+  const paidMap = new Map(
+    receiptTotals.map((r) => [r.memberId, { totalPaid: r._sum.amount ?? 0, count: r._count._all }])
+  )
 
   const isOpenFund = fund?.type === "OPEN"
 
@@ -39,8 +48,9 @@ export async function getMemberWiseReport(from?: string, to?: string, fundId?: s
   const fundStartDate = fund ? new Date(fund.startDate ?? fund.createdAt) : null
 
   return members.map((member) => {
-    const totalPaid = member.receipts.reduce((sum, r) => sum + r.amount, 0)
-    const paymentsCount = member.receipts.length
+    const memberData = paidMap.get(member.id)
+    const totalPaid = memberData?.totalPaid ?? 0
+    const paymentsCount = memberData?.count ?? 0
 
     // For yearly funds: expected = yearlyAmount (full amount, no proration)
     // For legacy monthly funds (no yearlyAmount): fall back to old monthly calc
@@ -165,6 +175,7 @@ export async function getTransactionTimeline(from?: string, to?: string, fundId?
     db.receipt.findMany({
       where: receiptWhere,
       orderBy: { date: "desc" },
+      take: 50,
       include: {
         member: { select: { name: true } },
         fund: { select: { name: true } },
@@ -173,6 +184,7 @@ export async function getTransactionTimeline(from?: string, to?: string, fundId?
     db.payment.findMany({
       where: dateFilter,
       orderBy: { date: "desc" },
+      take: 50,
     }),
   ])
 
@@ -195,5 +207,5 @@ export async function getTransactionTimeline(from?: string, to?: string, fundId?
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
-  return timeline
+  return timeline.slice(0, 50)
 }
