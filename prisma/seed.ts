@@ -1,20 +1,13 @@
 import { config } from "dotenv"
 config()
 
-import { neonConfig } from "@neondatabase/serverless"
-import { PrismaNeon } from "@prisma/adapter-neon"
+import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "@prisma/client"
-import ws from "ws"
 import bcrypt from "bcryptjs"
 
-neonConfig.webSocketConstructor = ws as unknown as typeof WebSocket
-
-const connectionString = process.env.DATABASE_URL
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not set")
-}
-
-const adapter = new PrismaNeon({ connectionString })
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+})
 const prisma = new PrismaClient({ adapter })
 
 // Members from the group spreadsheet (updated 30.12.2025)

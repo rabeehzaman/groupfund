@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { writeFile, mkdir } from "fs/promises"
-import { join } from "path"
 import { auth } from "@/lib/auth"
+import { supabase } from "@/lib/supabase"
 
 export async function POST(request: NextRequest) {
   const session = await auth()
@@ -30,14 +29,30 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const bytes = await file.arrayBuffer()
-  const buffer = Buffer.from(bytes)
+  const bucket = (formData.get("bucket") as string) || "proofs"
   const ext = file.name.split(".").pop() || "bin"
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
-  const uploadDir = join(process.cwd(), "public", "uploads")
-  await mkdir(uploadDir, { recursive: true })
-  await writeFile(join(uploadDir, filename), buffer)
+  const bytes = await file.arrayBuffer()
+  const buffer = Buffer.from(bytes)
 
-  return NextResponse.json({ url: `/uploads/${filename}` })
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(filename, buffer, {
+      contentType: file.type,
+      upsert: false,
+    })
+
+  if (error) {
+    return NextResponse.json(
+      { error: "Upload failed: " + error.message },
+      { status: 500 }
+    )
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(bucket).getPublicUrl(filename)
+
+  return NextResponse.json({ url: publicUrl })
 }

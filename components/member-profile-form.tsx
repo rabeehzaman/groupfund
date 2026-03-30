@@ -1,9 +1,8 @@
 "use client"
 
-import { useActionState, useEffect, useState } from "react"
+import { useActionState, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import Image from "next/image"
-import { CldUploadWidget } from "next-cloudinary"
 import { Camera, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,6 +47,8 @@ const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
 export function MemberProfileForm({ member }: { member: Member }) {
   const [state, formAction, isPending] = useActionState(updateMyProfile, null)
   const [photoUrl, setPhotoUrl] = useState(member.photoUrl || "")
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [memberOfJAA, setMemberOfJAA] = useState(member.memberOfJAA)
   const [memberOfAKBJAF, setMemberOfAKBJAF] = useState(member.memberOfAKBJAF)
   const [pmjjby, setPmjjby] = useState(member.pmjjby)
@@ -83,32 +84,35 @@ export function MemberProfileForm({ member }: { member: Member }) {
                   <User className="size-12 text-muted-foreground" />
                 </div>
               )}
-              <CldUploadWidget
-                signatureEndpoint="/api/cloudinary-sign"
-                options={{
-                  maxFiles: 1,
-                  resourceType: "image",
-                  folder: "bizarchcollective/profiles",
-                  cropping: true,
-                  croppingAspectRatio: 1,
-                  croppingShowDimensions: true,
-                }}
-                onSuccess={(result) => {
-                  if (typeof result.info === "object" && result.info?.secure_url) {
-                    setPhotoUrl(result.info.secure_url)
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  setUploading(true)
+                  const fd = new FormData()
+                  fd.append("file", f)
+                  fd.append("bucket", "profiles")
+                  try {
+                    const res = await fetch("/api/upload", { method: "POST", body: fd })
+                    const data = await res.json()
+                    if (res.ok) setPhotoUrl(data.url)
+                  } finally {
+                    setUploading(false)
                   }
                 }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="absolute bottom-0 right-0 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
               >
-                {({ open }) => (
-                  <button
-                    type="button"
-                    onClick={() => open()}
-                    className="absolute bottom-0 right-0 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
-                  >
-                    <Camera className="size-4" />
-                  </button>
-                )}
-              </CldUploadWidget>
+                <Camera className="size-4" />
+              </button>
             </div>
             <input type="hidden" name="photoUrl" value={photoUrl} />
             <div className="text-center">
