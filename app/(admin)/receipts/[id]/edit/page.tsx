@@ -3,6 +3,7 @@ import { getReceipt } from "@/lib/actions/receipts"
 import { getMembers } from "@/lib/actions/members"
 import { getActiveFunds } from "@/lib/actions/funds"
 import { ReceiptForm } from "@/components/receipt-form"
+import { ReceiptDeleteButton } from "../receipt-delete-button"
 
 export default async function EditReceiptPage({
   params,
@@ -20,7 +21,10 @@ export default async function EditReceiptPage({
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Edit Receipt</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Edit Receipt</h1>
+        <ReceiptDeleteButton receiptId={id} />
+      </div>
       <ReceiptForm
         receipt={receipt}
         members={members.map((m) => ({

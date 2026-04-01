@@ -15,12 +15,16 @@ export function MemberDeleteButton({
   const router = useRouter()
 
   const handleDelete = async () => {
-    const result = await deleteMember(memberId)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Member deleted")
-      router.push("/members")
+    try {
+      const result = await deleteMember(memberId)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success("Member deleted")
+        router.push("/members")
+      }
+    } catch {
+      toast.error("Failed to delete member")
     }
   }
 
