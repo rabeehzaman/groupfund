@@ -2,33 +2,63 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { db } from "@/lib/db"
+import { supabase, generateId, now } from "@/lib/supabase"
 import { fundSchema } from "@/lib/validations/fund"
 import { requireAdmin } from "@/lib/auth-utils"
 
 export async function getFunds() {
-  return db.fund.findMany({
-    orderBy: [{ isDefault: "desc" }, { name: "asc" }],
-    include: { _count: { select: { receipts: true } } },
+  const { data, error } = await supabase
+    .from('Fund')
+    .select('*, Receipt(count)')
+    .order('isDefault', { ascending: false })
+    .order('name')
+
+  if (error) throw error
+
+  return (data ?? []).map((row: any) => {
+    const _count = { receipts: row.Receipt?.[0]?.count ?? 0 }
+    const { Receipt, ...rest } = row
+    return { ...rest, _count }
   })
 }
 
 export async function getActiveFunds() {
-  return db.fund.findMany({
-    where: { isActive: true },
-    orderBy: [{ isDefault: "desc" }, { name: "asc" }],
-  })
+  const { data, error } = await supabase
+    .from('Fund')
+    .select('*')
+    .eq('isActive', true)
+    .order('isDefault', { ascending: false })
+    .order('name')
+
+  if (error) throw error
+  return data ?? []
 }
 
 export async function getFund(id: string) {
-  return db.fund.findUnique({
-    where: { id },
-    include: { _count: { select: { receipts: true } } },
-  })
+  const { data, error } = await supabase
+    .from('Fund')
+    .select('*, Receipt(count)')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return null
+
+  const _count = { receipts: data.Receipt?.[0]?.count ?? 0 }
+  const { Receipt, ...rest } = data
+  return { ...rest, _count }
 }
 
 export async function getDefaultFund() {
-  return db.fund.findFirst({ where: { isDefault: true } })
+  const { data, error } = await supabase
+    .from('Fund')
+    .select('*')
+    .eq('isDefault', true)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
 }
 
 export async function createFund(
@@ -64,6 +94,7 @@ export async function createFund(
   }
 
   const data: {
+    id: string
     name: string
     type: "FIXED" | "OPEN"
     amount: number | null
@@ -72,8 +103,11 @@ export async function createFund(
     description: string
     purpose: string
     isRecurring: boolean
-    startDate: Date | null
+    startDate: string | null
+    createdAt: string
+    updatedAt: string
   } = {
+    id: generateId(),
     name: parsed.data.name,
     type: parsed.data.type,
     amount: parsed.data.type === "FIXED" ? (parsed.data.amount ?? null) : null,
@@ -83,10 +117,14 @@ export async function createFund(
     description: parsed.data.description ?? "",
     purpose: parsed.data.purpose ?? "",
     isRecurring: parsed.data.isRecurring ?? true,
-    startDate: parsed.data.startDate ?? null,
+    startDate: parsed.data.startDate ? new Date(parsed.data.startDate).toISOString() : null,
+    createdAt: now(),
+    updatedAt: now(),
   }
 
-  await db.fund.create({ data })
+  const { error } = await supabase.from('Fund').insert(data)
+  if (error) throw error
+
   revalidatePath("/funds")
   redirect("/funds")
 }
@@ -97,7 +135,13 @@ export async function updateFund(
   formData: FormData
 ) {
   await requireAdmin()
-  const existing = await db.fund.findUnique({ where: { id } })
+  const { data: existing, error: existingError } = await supabase
+    .from('Fund')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (existingError) throw existingError
   if (!existing) return { error: { name: ["Fund not found"] } }
 
   const raw: Record<string, unknown> = {
@@ -136,7 +180,8 @@ export async function updateFund(
     description: string
     purpose: string
     isRecurring: boolean
-    startDate: Date | null
+    startDate: string | null
+    updatedAt: string
   } = {
     name: parsed.data.name,
     type: parsed.data.type,
@@ -147,27 +192,37 @@ export async function updateFund(
     description: parsed.data.description ?? "",
     purpose: parsed.data.purpose ?? "",
     isRecurring: parsed.data.isRecurring ?? true,
-    startDate: parsed.data.startDate ?? null,
+    startDate: parsed.data.startDate ? new Date(parsed.data.startDate).toISOString() : null,
+    updatedAt: now(),
   }
 
-  await db.fund.update({ where: { id }, data })
+  const { error } = await supabase.from('Fund').update(data).eq('id', id)
+  if (error) throw error
+
   revalidatePath("/funds")
   redirect("/funds")
 }
 
 export async function deleteFund(id: string) {
   await requireAdmin()
-  const fund = await db.fund.findUnique({
-    where: { id },
-    include: { _count: { select: { receipts: true } } },
-  })
 
+  const { data: fund, error: fundError } = await supabase
+    .from('Fund')
+    .select('*, Receipt(count)')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (fundError) throw fundError
   if (!fund) return { error: "Fund not found" }
   if (fund.isDefault) return { error: "Cannot delete the default fund" }
-  if (fund._count.receipts > 0)
+
+  const receiptCount = fund.Receipt?.[0]?.count ?? 0
+  if (receiptCount > 0)
     return { error: "Cannot delete a fund that has receipts" }
 
-  await db.fund.delete({ where: { id } })
+  const { error } = await supabase.from('Fund').delete().eq('id', id)
+  if (error) throw error
+
   revalidatePath("/funds")
   return { success: true }
 }

@@ -1,6 +1,6 @@
 "use server"
 
-import { db } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 import { requireAuth } from "@/lib/auth-utils"
 
 export type Defaulter = {
@@ -25,12 +25,19 @@ export async function getDefaulters(fundId?: string): Promise<Defaulter[]> {
   await requireAuth()
 
   // Get the target fund (or default fund)
-  let fund = fundId
-    ? await db.fund.findUnique({ where: { id: fundId } })
-    : await db.fund.findFirst({ where: { isDefault: true } })
+  let fund: any = null
+  if (fundId) {
+    const { data, error } = await supabase.from("Fund").select("*").eq("id", fundId).single()
+    if (error) throw error
+    fund = data
+  } else {
+    const { data } = await supabase.from("Fund").select("*").eq("isDefault", true).limit(1).single()
+    fund = data
+  }
 
   if (!fund) {
-    fund = await db.fund.findFirst({ where: { isActive: true } })
+    const { data } = await supabase.from("Fund").select("*").eq("isActive", true).limit(1).single()
+    fund = data
   }
   if (!fund || fund.type === "OPEN") return []
 
@@ -38,22 +45,29 @@ export async function getDefaulters(fundId?: string): Promise<Defaulter[]> {
   const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
   if (yearlyAmount <= 0) return []
 
-  // Use groupBy for aggregates instead of loading all receipts into memory
-  const [members, receiptTotals] = await Promise.all([
-    db.member.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, branch: true, joinDate: true },
-    }),
-    db.receipt.groupBy({
-      by: ["memberId"],
-      where: { fundId: fund.id },
-      _sum: { amount: true },
-    }),
+  // Fetch members and receipt totals in parallel
+  const [membersResult, receiptResult] = await Promise.all([
+    supabase
+      .from("Member")
+      .select("id, name, branch, joinDate")
+      .eq("isActive", true),
+    supabase
+      .from("Receipt")
+      .select("memberId, amount")
+      .eq("fundId", fund.id),
   ])
 
-  const paidMap = new Map(
-    receiptTotals.map((r) => [r.memberId, r._sum.amount ?? 0])
-  )
+  if (membersResult.error) throw membersResult.error
+  if (receiptResult.error) throw receiptResult.error
+
+  const members = membersResult.data ?? []
+  const receiptRows = receiptResult.data ?? []
+
+  // Group receipts by memberId
+  const paidMap = new Map<string, number>()
+  for (const r of receiptRows) {
+    paidMap.set(r.memberId, (paidMap.get(r.memberId) ?? 0) + r.amount)
+  }
 
   return members
     .map((member) => {
@@ -84,31 +98,44 @@ export async function getDefaulters(fundId?: string): Promise<Defaulter[]> {
 }
 
 export async function getDefaulterStatus(memberId: string, fundId?: string) {
-  let fund = fundId
-    ? await db.fund.findUnique({ where: { id: fundId } })
-    : await db.fund.findFirst({ where: { isDefault: true } })
+  // Get the target fund
+  let fund: any = null
+  if (fundId) {
+    const { data, error } = await supabase.from("Fund").select("*").eq("id", fundId).single()
+    if (error) throw error
+    fund = data
+  } else {
+    const { data } = await supabase.from("Fund").select("*").eq("isDefault", true).limit(1).single()
+    fund = data
+  }
 
   if (!fund) {
-    fund = await db.fund.findFirst({ where: { isActive: true } })
+    const { data } = await supabase.from("Fund").select("*").eq("isActive", true).limit(1).single()
+    fund = data
   }
   if (!fund || fund.type === "OPEN") return null
 
   const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
   if (yearlyAmount <= 0) return null
 
-  const member = await db.member.findUnique({
-    where: { id: memberId },
-    include: {
-      receipts: {
-        where: { fundId: fund.id },
-        select: { amount: true },
-      },
-    },
-  })
-
+  // Fetch member
+  const { data: member, error: memberError } = await supabase
+    .from("Member")
+    .select("*")
+    .eq("id", memberId)
+    .single()
+  if (memberError) throw memberError
   if (!member) return null
 
-  const totalPaid = member.receipts.reduce((sum, r) => sum + r.amount, 0)
+  // Fetch receipts for this member and fund
+  const { data: receiptRows, error: receiptError } = await supabase
+    .from("Receipt")
+    .select("amount")
+    .eq("memberId", memberId)
+    .eq("fundId", fund.id)
+  if (receiptError) throw receiptError
+
+  const totalPaid = (receiptRows ?? []).reduce((sum, r) => sum + r.amount, 0)
   const pendingAmount = yearlyAmount - totalPaid
 
   if (pendingAmount <= 0) return null

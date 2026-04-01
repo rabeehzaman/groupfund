@@ -1,31 +1,41 @@
 "use server"
 
-import { db } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 
-function buildDateFilter(from?: string, to?: string) {
-  const where: { date?: { gte?: Date; lte?: Date } } = {}
-  if (from || to) {
-    where.date = {}
-    if (from) where.date.gte = new Date(from)
-    if (to) where.date.lte = new Date(to + "T23:59:59.999Z")
-  }
-  return where
+function buildDateFilters(query: ReturnType<ReturnType<typeof supabase.from>["select"]>, from?: string, to?: string) {
+  if (from) query = query.gte("date", from)
+  if (to) query = query.lte("date", to + "T23:59:59.999Z")
+  return query
 }
 
 export async function getDashboardStats(from?: string, to?: string) {
-  const dateFilter = buildDateFilter(from, to)
-  const [members, receipts, payments] = await Promise.all([
-    db.member.count({ where: { isActive: true } }),
-    db.receipt.aggregate({ where: dateFilter, _sum: { amount: true } }),
-    db.payment.aggregate({ where: dateFilter, _sum: { amount: true } }),
-  ])
+  // Count active members
+  const { count: totalMembers, error: membersError } = await supabase
+    .from("Member")
+    .select("*", { count: "exact", head: true })
+    .eq("isActive", true)
+  if (membersError) throw membersError
 
-  const totalCollected = receipts._sum.amount || 0
-  const totalExpenses = payments._sum.amount || 0
+  // Fetch receipt amounts
+  let receiptQuery = supabase.from("Receipt").select("amount")
+  if (from) receiptQuery = receiptQuery.gte("date", from)
+  if (to) receiptQuery = receiptQuery.lte("date", to + "T23:59:59.999Z")
+  const { data: receiptRows, error: receiptError } = await receiptQuery
+  if (receiptError) throw receiptError
+
+  // Fetch payment amounts
+  let paymentQuery = supabase.from("Payment").select("amount")
+  if (from) paymentQuery = paymentQuery.gte("date", from)
+  if (to) paymentQuery = paymentQuery.lte("date", to + "T23:59:59.999Z")
+  const { data: paymentRows, error: paymentError } = await paymentQuery
+  if (paymentError) throw paymentError
+
+  const totalCollected = (receiptRows ?? []).reduce((sum, r) => sum + r.amount, 0)
+  const totalExpenses = (paymentRows ?? []).reduce((sum, p) => sum + p.amount, 0)
   const netBalance = totalCollected - totalExpenses
 
   return {
-    totalMembers: members,
+    totalMembers: totalMembers ?? 0,
     totalCollected,
     totalExpenses,
     netBalance,
@@ -33,65 +43,74 @@ export async function getDashboardStats(from?: string, to?: string) {
 }
 
 export async function getCollectionTrend(from?: string, to?: string) {
-  const dateFilter = buildDateFilter(from, to)
-  const receipts = await db.receipt.groupBy({
-    by: ["forMonth"],
-    where: dateFilter,
-    _sum: { amount: true },
-    orderBy: { forMonth: "asc" },
-  })
+  let query = supabase.from("Receipt").select("forMonth, amount")
+  if (from) query = query.gte("date", from)
+  if (to) query = query.lte("date", to + "T23:59:59.999Z")
+  const { data: rows, error } = await query
+  if (error) throw error
 
-  return receipts.map((r) => ({
-    month: r.forMonth,
-    amount: r._sum.amount || 0,
-  }))
+  const monthTotals = new Map<string, number>()
+  for (const r of rows ?? []) {
+    monthTotals.set(r.forMonth, (monthTotals.get(r.forMonth) ?? 0) + r.amount)
+  }
+
+  return Array.from(monthTotals.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, amount]) => ({ month, amount }))
 }
 
 export async function getRecentActivity(from?: string, to?: string) {
-  const dateFilter = buildDateFilter(from, to)
-  const [recentReceipts, recentPayments] = await Promise.all([
-    db.receipt.findMany({
-      where: dateFilter,
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: {
-        member: { select: { name: true } },
-        fund: { select: { name: true } },
-      },
-    }),
-    db.payment.findMany({
-      where: dateFilter,
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    }),
-  ])
+  // Fetch recent receipts with member and fund names
+  let receiptQuery = supabase
+    .from("Receipt")
+    .select("id, createdAt, amount, member:Member(name), fund:Fund(name)")
+    .order("createdAt", { ascending: false })
+    .limit(5)
+  if (from) receiptQuery = receiptQuery.gte("date", from)
+  if (to) receiptQuery = receiptQuery.lte("date", to + "T23:59:59.999Z")
+  const { data: recentReceipts, error: receiptError } = await receiptQuery
+  if (receiptError) throw receiptError
+
+  // Fetch recent payments
+  let paymentQuery = supabase
+    .from("Payment")
+    .select("id, createdAt, amount, purpose, paidTo")
+    .order("createdAt", { ascending: false })
+    .limit(5)
+  if (from) paymentQuery = paymentQuery.gte("date", from)
+  if (to) paymentQuery = paymentQuery.lte("date", to + "T23:59:59.999Z")
+  const { data: recentPayments, error: paymentError } = await paymentQuery
+  if (paymentError) throw paymentError
 
   const activities = [
-    ...recentReceipts.map((r) => ({
+    ...(recentReceipts ?? []).map((r: any) => ({
       id: r.id,
       type: "receipt" as const,
-      description: `${r.member.name} - ${r.fund.name}`,
+      description: `${r.member?.name} - ${r.fund?.name}`,
       date: r.createdAt,
       amount: r.amount,
     })),
-    ...recentPayments.map((p) => ({
+    ...(recentPayments ?? []).map((p: any) => ({
       id: p.id,
       type: "payment" as const,
       description: `${p.purpose} - ${p.paidTo}`,
       date: p.createdAt,
       amount: -p.amount,
     })),
-  ].sort((a, b) => b.date.getTime() - a.date.getTime())
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   return activities.slice(0, 8)
 }
 
 export async function getCollectionRate() {
-  const [totalActive, defaultFund] = await Promise.all([
-    db.member.count({ where: { isActive: true } }),
-    db.fund.findFirst({ where: { isDefault: true } }),
+  const [memberResult, fundResult] = await Promise.all([
+    supabase.from("Member").select("*", { count: "exact", head: true }).eq("isActive", true),
+    supabase.from("Fund").select("*").eq("isDefault", true).limit(1).single(),
   ])
+  if (memberResult.error) throw memberResult.error
+  const totalActive = memberResult.count ?? 0
 
+  const defaultFund = fundResult.data
   if (!defaultFund) {
     return { paidCount: 0, totalActive, rate: 0 }
   }
@@ -102,17 +121,19 @@ export async function getCollectionRate() {
     return { paidCount: 0, totalActive, rate: 0 }
   }
 
-  // Count members who have fully paid their yearly amount for this fund
-  // Use groupBy to aggregate at database level instead of loading all receipts into memory
-  const receiptTotals = await db.receipt.groupBy({
-    by: ["memberId"],
-    where: { fundId: defaultFund.id },
-    _sum: { amount: true },
-  })
+  // Fetch receipt totals grouped by memberId
+  const { data: rows, error } = await supabase
+    .from("Receipt")
+    .select("memberId, amount")
+    .eq("fundId", defaultFund.id)
+  if (error) throw error
 
-  const paidCount = receiptTotals.filter(
-    (r) => (r._sum.amount ?? 0) >= yearlyAmount
-  ).length
+  const totals = new Map<string, number>()
+  for (const r of rows ?? []) {
+    totals.set(r.memberId, (totals.get(r.memberId) ?? 0) + r.amount)
+  }
+
+  const paidCount = Array.from(totals.values()).filter((sum) => sum >= yearlyAmount).length
 
   const rate = totalActive > 0 ? (paidCount / totalActive) * 100 : 0
   return { paidCount, totalActive, rate }

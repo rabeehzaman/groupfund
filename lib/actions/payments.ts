@@ -2,22 +2,33 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { db } from "@/lib/db"
+import { supabase, generateId, now } from "@/lib/supabase"
 import { paymentSchema } from "@/lib/validations/payment"
 import { requireAdmin } from "@/lib/auth-utils"
 
 export async function getPayments(from?: string, to?: string) {
-  const where: { date?: { gte?: Date; lte?: Date } } = {}
-  if (from || to) {
-    where.date = {}
-    if (from) where.date.gte = new Date(from)
-    if (to) where.date.lte = new Date(to + "T23:59:59.999Z")
-  }
-  return db.payment.findMany({ where, orderBy: { date: "desc" } })
+  let query = supabase
+    .from('Payment')
+    .select('*')
+    .order('date', { ascending: false })
+
+  if (from) query = query.gte('date', new Date(from).toISOString())
+  if (to) query = query.lte('date', new Date(to + "T23:59:59.999Z").toISOString())
+
+  const { data, error } = await query
+  if (error) throw error
+  return data
 }
 
 export async function getPayment(id: string) {
-  return db.payment.findUnique({ where: { id } })
+  const { data, error } = await supabase
+    .from('Payment')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
 }
 
 export async function createPayment(_prevState: unknown, formData: FormData) {
@@ -34,7 +45,16 @@ export async function createPayment(_prevState: unknown, formData: FormData) {
     return { error: parsed.error.flatten().fieldErrors }
   }
 
-  await db.payment.create({ data: parsed.data })
+  const { error } = await supabase
+    .from('Payment')
+    .insert({
+      id: generateId(),
+      ...parsed.data,
+      createdAt: now(),
+      updatedAt: now(),
+    })
+
+  if (error) throw error
   revalidatePath("/payments")
   revalidatePath("/dashboard")
   redirect("/payments")
@@ -54,7 +74,12 @@ export async function updatePayment(id: string, _prevState: unknown, formData: F
     return { error: parsed.error.flatten().fieldErrors }
   }
 
-  await db.payment.update({ where: { id }, data: parsed.data })
+  const { error } = await supabase
+    .from('Payment')
+    .update({ ...parsed.data, updatedAt: now() })
+    .eq('id', id)
+
+  if (error) throw error
   revalidatePath("/payments")
   revalidatePath("/dashboard")
   redirect("/payments")
@@ -62,7 +87,12 @@ export async function updatePayment(id: string, _prevState: unknown, formData: F
 
 export async function deletePayment(id: string) {
   await requireAdmin()
-  await db.payment.delete({ where: { id } })
+  const { error } = await supabase
+    .from('Payment')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
   revalidatePath("/payments")
   revalidatePath("/dashboard")
   return { success: true }

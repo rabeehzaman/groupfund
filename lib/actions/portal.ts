@@ -1,7 +1,7 @@
 "use server"
 
 import { auth } from "@/lib/auth"
-import { db } from "@/lib/db"
+import { supabase, now } from "@/lib/supabase"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { memberProfileSchema } from "@/lib/validations/member"
@@ -15,33 +15,46 @@ async function getMyMemberId() {
 export async function getMyDashboard() {
   const memberId = await getMyMemberId()
 
-  const member = await db.member.findUnique({
-    where: { id: memberId },
-    include: {
-      receipts: {
-        orderBy: { forMonth: "desc" },
-        include: {
-          fund: { select: { id: true, name: true, type: true, amount: true } },
-        },
-      },
-    },
-  })
+  const { data: member, error } = await supabase
+    .from('Member')
+    .select('*, Receipt(*, Fund(id, name, type, amount))')
+    .eq('id', memberId)
+    .single()
 
+  if (error) throw error
   if (!member) redirect("/login")
 
-  const totalPaid = member.receipts.reduce((sum, r) => sum + r.amount, 0)
-  const paymentsCount = member.receipts.length
+  // Rename relations and sort receipts desc by forMonth
+  const receipts = (member.Receipt ?? [])
+    .map((r: any) => {
+      const { Fund, ...rest } = r
+      return { ...rest, fund: Fund }
+    })
+    .sort((a: any, b: any) => {
+      const aMonth = a.forMonth ?? ""
+      const bMonth = b.forMonth ?? ""
+      return aMonth > bMonth ? -1 : aMonth < bMonth ? 1 : 0
+    })
 
-  return { member, totalPaid, paymentsCount }
+  const { Receipt, ...memberRest } = member
+  const memberWithReceipts = { ...memberRest, receipts }
+
+  const totalPaid = receipts.reduce((sum: number, r: any) => sum + r.amount, 0)
+  const paymentsCount = receipts.length
+
+  return { member: memberWithReceipts, totalPaid, paymentsCount }
 }
 
 export async function getMyProfile() {
   const memberId = await getMyMemberId()
 
-  const member = await db.member.findUnique({
-    where: { id: memberId },
-  })
+  const { data: member, error } = await supabase
+    .from('Member')
+    .select('*')
+    .eq('id', memberId)
+    .maybeSingle()
 
+  if (error) throw error
   if (!member) redirect("/login")
   return member
 }
@@ -77,10 +90,12 @@ export async function updateMyProfile(_prevState: unknown, formData: FormData) {
     return { error: parsed.error.flatten().fieldErrors }
   }
 
-  await db.member.update({
-    where: { id: memberId },
-    data: parsed.data,
-  })
+  const { error } = await supabase
+    .from('Member')
+    .update({ ...parsed.data, updatedAt: now() })
+    .eq('id', memberId)
+
+  if (error) throw error
 
   revalidatePath("/portal")
   revalidatePath("/portal/profile")
@@ -90,39 +105,57 @@ export async function updateMyProfile(_prevState: unknown, formData: FormData) {
 export async function getMyPayments() {
   const memberId = await getMyMemberId()
 
-  return db.receipt.findMany({
-    where: { memberId },
-    orderBy: { date: "desc" },
-    include: {
-      fund: { select: { name: true } },
-    },
+  const { data, error } = await supabase
+    .from('Receipt')
+    .select('*, Fund(name)')
+    .eq('memberId', memberId)
+    .order('date', { ascending: false })
+
+  if (error) throw error
+
+  return (data ?? []).map((row: any) => {
+    const { Fund, ...rest } = row
+    return { ...rest, fund: Fund }
   })
 }
 
 export async function getMyReceiptsForUpload() {
   const memberId = await getMyMemberId()
 
-  return db.receipt.findMany({
-    where: { memberId },
-    orderBy: { date: "desc" },
-    include: {
-      fund: { select: { name: true } },
-    },
+  const { data, error } = await supabase
+    .from('Receipt')
+    .select('*, Fund(name)')
+    .eq('memberId', memberId)
+    .order('date', { ascending: false })
+
+  if (error) throw error
+
+  return (data ?? []).map((row: any) => {
+    const { Fund, ...rest } = row
+    return { ...rest, fund: Fund }
   })
 }
 
 export async function attachProofToReceipt(receiptId: string, proofUrl: string) {
   const memberId = await getMyMemberId()
 
-  const receipt = await db.receipt.findUnique({ where: { id: receiptId } })
+  const { data: receipt, error: fetchError } = await supabase
+    .from('Receipt')
+    .select('*')
+    .eq('id', receiptId)
+    .maybeSingle()
+
+  if (fetchError) throw fetchError
   if (!receipt || receipt.memberId !== memberId) {
     throw new Error("Receipt not found or not yours")
   }
 
-  await db.receipt.update({
-    where: { id: receiptId },
-    data: { proofUrl, status: "PENDING" },
-  })
+  const { error } = await supabase
+    .from('Receipt')
+    .update({ proofUrl, status: "PENDING", updatedAt: now() })
+    .eq('id', receiptId)
+
+  if (error) throw error
 
   revalidatePath("/portal")
   return { success: true }

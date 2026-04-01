@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
-import { db } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 import { generateExcel, generateCSV, generatePDF } from "@/lib/export"
 
 export async function GET(request: NextRequest) {
@@ -12,20 +12,19 @@ export async function GET(request: NextRequest) {
   const from = searchParams.get("from")
   const to = searchParams.get("to")
 
-  const where: { date?: { gte?: Date; lte?: Date } } = {}
-  if (from || to) {
-    where.date = {}
-    if (from) where.date.gte = new Date(from)
-    if (to) where.date.lte = new Date(to + "T23:59:59.999Z")
-  }
+  let query = supabase
+    .from('Payment')
+    .select('*')
+    .order('date', { ascending: false })
 
-  const payments = await db.payment.findMany({
-    where,
-    orderBy: { date: "desc" },
-  })
+  if (from) query = query.gte('date', new Date(from).toISOString())
+  if (to) query = query.lte('date', new Date(to + "T23:59:59.999Z").toISOString())
+
+  const { data: payments, error } = await query
+  if (error) throw error
 
   const data = payments.map((p) => ({
-    Date: p.date.toLocaleDateString("en-IN"),
+    Date: new Date(p.date).toLocaleDateString("en-IN"),
     Purpose: p.purpose,
     "Paid To": p.paidTo,
     Amount: p.amount,

@@ -28,7 +28,7 @@ export default async function UploadProofPage() {
             </p>
           ) : (
             <ProofUploadForm
-              receipts={receipts.map((r) => ({
+              receipts={receipts.map((r: any) => ({
                 id: r.id,
                 forMonth: r.forMonth,
                 amount: r.amount,

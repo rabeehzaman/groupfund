@@ -144,7 +144,7 @@ export default async function FundDetailPage({
             </p>
           ) : (
             <div className="divide-y">
-              {data.recentReceipts.map((receipt) => (
+              {data.recentReceipts.map((receipt: any) => (
                 <div
                   key={receipt.id}
                   className="flex items-center justify-between py-3 first:pt-0 last:pb-0"

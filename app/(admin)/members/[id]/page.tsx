@@ -166,7 +166,7 @@ export default async function MemberDetailPage({
         {fundEntries.map((entry) => (
           <TabsContent key={entry.fund.id} value={entry.fund.id} className="space-y-6">
             <PaymentGrid
-              receipts={entry.receipts.map((r) => ({
+              receipts={entry.receipts.map((r: any) => ({
                 forMonth: r.forMonth,
                 amount: r.amount,
               }))}
@@ -201,7 +201,7 @@ export default async function MemberDetailPage({
                     {entry.receipts
                       .slice()
                       .reverse()
-                      .map((receipt) => (
+                      .map((receipt: any) => (
                         <div
                           key={receipt.id}
                           className="flex items-center justify-between py-3 first:pt-0 last:pb-0"

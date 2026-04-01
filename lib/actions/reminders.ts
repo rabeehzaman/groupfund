@@ -1,6 +1,6 @@
 "use server"
 
-import { db } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/format"
 import { requireAdmin } from "@/lib/auth-utils"
 
@@ -8,34 +8,48 @@ export async function getPendingMembers(fundId?: string) {
   await requireAdmin()
 
   // Get the target fund
-  let fund = fundId
-    ? await db.fund.findUnique({ where: { id: fundId } })
-    : await db.fund.findFirst({ where: { isDefault: true } })
+  let fund: any = null
+  if (fundId) {
+    const { data, error } = await supabase.from("Fund").select("*").eq("id", fundId).single()
+    if (error) throw error
+    fund = data
+  } else {
+    const { data } = await supabase.from("Fund").select("*").eq("isDefault", true).limit(1).single()
+    fund = data
+  }
 
   if (!fund) {
-    fund = await db.fund.findFirst({ where: { isActive: true } })
+    const { data } = await supabase.from("Fund").select("*").eq("isActive", true).limit(1).single()
+    fund = data
   }
   if (!fund) return { pending: [], total: 0, paid: 0, fundName: "" }
 
   const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
 
-  // Use groupBy for aggregates instead of loading all receipts into memory
-  const [members, receiptTotals] = await Promise.all([
-    db.member.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, branch: true },
-      orderBy: { name: "asc" },
-    }),
-    db.receipt.groupBy({
-      by: ["memberId"],
-      where: { fundId: fund.id },
-      _sum: { amount: true },
-    }),
+  // Fetch members and receipt totals in parallel
+  const [membersResult, receiptResult] = await Promise.all([
+    supabase
+      .from("Member")
+      .select("id, name, branch")
+      .eq("isActive", true)
+      .order("name", { ascending: true }),
+    supabase
+      .from("Receipt")
+      .select("memberId, amount")
+      .eq("fundId", fund.id),
   ])
 
-  const paidMap = new Map(
-    receiptTotals.map((r) => [r.memberId, r._sum.amount ?? 0])
-  )
+  if (membersResult.error) throw membersResult.error
+  if (receiptResult.error) throw receiptResult.error
+
+  const members = membersResult.data ?? []
+  const receiptRows = receiptResult.data ?? []
+
+  // Group receipts by memberId
+  const paidMap = new Map<string, number>()
+  for (const r of receiptRows) {
+    paidMap.set(r.memberId, (paidMap.get(r.memberId) ?? 0) + r.amount)
+  }
 
   const pending = members
     .map((m) => {

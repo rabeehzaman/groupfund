@@ -1,22 +1,37 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { db } from "@/lib/db"
+import { supabase, now } from "@/lib/supabase"
 import { settingsSchema } from "@/lib/validations/settings"
 import { requireAdmin } from "@/lib/auth-utils"
 
 export async function getSettings() {
-  let settings = await db.settings.findUnique({ where: { id: "default" } })
+  const { data: settings, error } = await supabase
+    .from('Settings')
+    .select('*')
+    .eq('id', 'default')
+    .maybeSingle()
+
+  if (error) throw error
+
   if (!settings) {
-    settings = await db.settings.create({
-      data: {
+    const { data: created, error: createError } = await supabase
+      .from('Settings')
+      .insert({
         id: "default",
         groupName: "Group Fund",
         defaultMonthlyAmount: 1000,
         financialYearStart: 7,
-      },
-    })
+        createdAt: now(),
+        updatedAt: now(),
+      })
+      .select()
+      .single()
+
+    if (createError) throw createError
+    return created
   }
+
   return settings
 }
 
@@ -33,10 +48,12 @@ export async function updateSettings(_prevState: unknown, formData: FormData) {
     return { error: parsed.error.flatten().fieldErrors }
   }
 
-  await db.settings.update({
-    where: { id: "default" },
-    data: parsed.data,
-  })
+  const { error } = await supabase
+    .from('Settings')
+    .update({ ...parsed.data, updatedAt: now() })
+    .eq('id', 'default')
+
+  if (error) throw error
 
   revalidatePath("/settings")
   revalidatePath("/dashboard")

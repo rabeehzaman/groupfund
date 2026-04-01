@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
-import { db } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -13,9 +13,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email as string },
-        })
+        const { data: user, error } = await supabase
+          .from('User')
+          .select('*')
+          .eq('email', credentials.email as string)
+          .maybeSingle()
+
+        if (error) throw error
         if (!user) return null
 
         const valid = await bcrypt.compare(

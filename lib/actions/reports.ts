@@ -1,46 +1,48 @@
 "use server"
 
-import { db } from "@/lib/db"
-
-function buildDateFilter(from?: string, to?: string) {
-  const where: { date?: { gte?: Date; lte?: Date } } = {}
-  if (from || to) {
-    where.date = {}
-    if (from) where.date.gte = new Date(from)
-    if (to) where.date.lte = new Date(to + "T23:59:59.999Z")
-  }
-  return where
-}
+import { supabase } from "@/lib/supabase"
 
 export async function getMemberWiseReport(from?: string, to?: string, fundId?: string) {
-  const receiptWhere: { fundId?: string; date?: { gte?: Date; lte?: Date } } = {}
-  if (fundId) receiptWhere.fundId = fundId
-  if (from || to) {
-    receiptWhere.date = {}
-    if (from) receiptWhere.date.gte = new Date(from)
-    if (to) receiptWhere.date.lte = new Date(to + "T23:59:59.999Z")
-  }
+  // Build receipt query
+  let receiptQuery = supabase.from("Receipt").select("memberId, amount")
+  if (fundId) receiptQuery = receiptQuery.eq("fundId", fundId)
+  if (from) receiptQuery = receiptQuery.gte("date", from)
+  if (to) receiptQuery = receiptQuery.lte("date", to + "T23:59:59.999Z")
 
-  // Use groupBy for aggregates instead of loading all receipts into memory
-  const [members, receiptTotals, fund, settings] = await Promise.all([
-    db.member.findMany({
-      where: { isActive: true },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, branch: true, joinDate: true, monthlyAmount: true },
-    }),
-    db.receipt.groupBy({
-      by: ["memberId"],
-      where: receiptWhere,
-      _sum: { amount: true },
-      _count: { _all: true },
-    }),
-    fundId ? db.fund.findUnique({ where: { id: fundId } }) : null,
-    db.settings.findUnique({ where: { id: "default" } }),
+  const [membersResult, receiptResult, fundResult, settingsResult] = await Promise.all([
+    supabase
+      .from("Member")
+      .select("id, name, branch, joinDate, monthlyAmount")
+      .eq("isActive", true)
+      .order("name", { ascending: true }),
+    receiptQuery,
+    fundId
+      ? supabase.from("Fund").select("*").eq("id", fundId).single()
+      : Promise.resolve({ data: null, error: null }),
+    supabase.from("Settings").select("*").eq("id", "default").single(),
   ])
 
-  const paidMap = new Map(
-    receiptTotals.map((r) => [r.memberId, { totalPaid: r._sum.amount ?? 0, count: r._count._all }])
-  )
+  if (membersResult.error) throw membersResult.error
+  if (receiptResult.error) throw receiptResult.error
+  if (fundResult.error) throw fundResult.error
+  // settings may not exist, don't throw
+
+  const members = membersResult.data ?? []
+  const receiptRows = receiptResult.data ?? []
+  const fund = fundResult.data
+  const settings = settingsResult.data
+
+  // Group receipts by memberId: sum and count
+  const paidMap = new Map<string, { totalPaid: number; count: number }>()
+  for (const r of receiptRows) {
+    const existing = paidMap.get(r.memberId)
+    if (existing) {
+      existing.totalPaid += r.amount
+      existing.count++
+    } else {
+      paidMap.set(r.memberId, { totalPaid: r.amount, count: 1 })
+    }
+  }
 
   const isOpenFund = fund?.type === "OPEN"
 
@@ -63,7 +65,7 @@ export async function getMemberWiseReport(from?: string, to?: string, fundId?: s
       expectedTotal = 0
       pendingAmount = 0
     } else if (yearlyAmount) {
-      // Yearly amount system — full amount expected
+      // Yearly amount system -- full amount expected
       expectedTotal = yearlyAmount
       pendingAmount = expectedTotal - totalPaid
     } else {
@@ -106,30 +108,71 @@ export async function getMemberWiseReport(from?: string, to?: string, fundId?: s
 }
 
 export async function getOverallSummary(from?: string, to?: string, fundId?: string) {
-  const dateFilter = buildDateFilter(from, to)
-  const receiptWhere = { ...dateFilter, ...(fundId ? { fundId } : {}) }
-  const [memberCount, receiptAgg, paymentAgg, receiptsByMonth, payments] =
+  // Build receipt filters
+  let receiptAmountQuery = supabase.from("Receipt").select("amount")
+  if (fundId) receiptAmountQuery = receiptAmountQuery.eq("fundId", fundId)
+  if (from) receiptAmountQuery = receiptAmountQuery.gte("date", from)
+  if (to) receiptAmountQuery = receiptAmountQuery.lte("date", to + "T23:59:59.999Z")
+
+  let paymentAmountQuery = supabase.from("Payment").select("amount")
+  if (from) paymentAmountQuery = paymentAmountQuery.gte("date", from)
+  if (to) paymentAmountQuery = paymentAmountQuery.lte("date", to + "T23:59:59.999Z")
+
+  let receiptMonthQuery = supabase.from("Receipt").select("forMonth, amount")
+  if (fundId) receiptMonthQuery = receiptMonthQuery.eq("fundId", fundId)
+  if (from) receiptMonthQuery = receiptMonthQuery.gte("date", from)
+  if (to) receiptMonthQuery = receiptMonthQuery.lte("date", to + "T23:59:59.999Z")
+
+  let paymentListQuery = supabase.from("Payment").select("date, amount")
+  if (from) paymentListQuery = paymentListQuery.gte("date", from)
+  if (to) paymentListQuery = paymentListQuery.lte("date", to + "T23:59:59.999Z")
+
+  const [memberCountResult, receiptResult, paymentResult, receiptMonthResult, paymentListResult] =
     await Promise.all([
-      db.member.count({ where: { isActive: true } }),
-      db.receipt.aggregate({ where: receiptWhere, _sum: { amount: true }, _count: true }),
-      db.payment.aggregate({ where: dateFilter, _sum: { amount: true }, _count: true }),
-      db.receipt.groupBy({
-        by: ["forMonth"],
-        where: receiptWhere,
-        _sum: { amount: true },
-        _count: true,
-        orderBy: { forMonth: "asc" },
-      }),
-      db.payment.findMany({
-        where: dateFilter,
-        select: { date: true, amount: true },
-      }),
+      supabase.from("Member").select("*", { count: "exact", head: true }).eq("isActive", true),
+      receiptAmountQuery,
+      paymentAmountQuery,
+      receiptMonthQuery,
+      paymentListQuery,
     ])
+
+  if (memberCountResult.error) throw memberCountResult.error
+  if (receiptResult.error) throw receiptResult.error
+  if (paymentResult.error) throw paymentResult.error
+  if (receiptMonthResult.error) throw receiptMonthResult.error
+  if (paymentListResult.error) throw paymentListResult.error
+
+  const memberCount = memberCountResult.count ?? 0
+  const receiptRows = receiptResult.data ?? []
+  const paymentRows = paymentResult.data ?? []
+  const receiptMonthRows = receiptMonthResult.data ?? []
+  const payments = paymentListResult.data ?? []
+
+  // Aggregate receipts
+  const totalCollected = receiptRows.reduce((sum, r) => sum + r.amount, 0)
+  const totalReceipts = receiptRows.length
+
+  // Aggregate payments
+  const totalExpenses = paymentRows.reduce((sum, p) => sum + p.amount, 0)
+  const totalPayments = paymentRows.length
+
+  // Group receipts by forMonth
+  const receiptsByMonth = new Map<string, { amount: number; count: number }>()
+  for (const r of receiptMonthRows) {
+    const existing = receiptsByMonth.get(r.forMonth)
+    if (existing) {
+      existing.amount += r.amount
+      existing.count++
+    } else {
+      receiptsByMonth.set(r.forMonth, { amount: r.amount, count: 1 })
+    }
+  }
 
   // Build monthly expenses map keyed by YYYY-MM
   const expensesByMonth: Record<string, { amount: number; count: number }> = {}
   for (const p of payments) {
-    const key = `${p.date.getFullYear()}-${String(p.date.getMonth() + 1).padStart(2, "0")}`
+    const d = new Date(p.date)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
     if (!expensesByMonth[key]) expensesByMonth[key] = { amount: 0, count: 0 }
     expensesByMonth[key].amount += p.amount
     expensesByMonth[key].count++
@@ -137,31 +180,28 @@ export async function getOverallSummary(from?: string, to?: string, fundId?: str
 
   // Merge all months from both collections and expenses
   const allMonths = new Set<string>()
-  receiptsByMonth.forEach((m) => { if (m.forMonth) allMonths.add(m.forMonth) })
+  receiptsByMonth.forEach((_, m) => { allMonths.add(m) })
   Object.keys(expensesByMonth).forEach((m) => allMonths.add(m))
   const sortedMonths = Array.from(allMonths).sort()
-
-  const totalCollected = receiptAgg._sum.amount || 0
-  const totalExpenses = paymentAgg._sum.amount || 0
 
   return {
     totalMembers: memberCount,
     totalCollected,
     totalExpenses,
     netBalance: totalCollected - totalExpenses,
-    totalReceipts: receiptAgg._count,
-    totalPayments: paymentAgg._count,
+    totalReceipts,
+    totalPayments,
     monthlyBreakdown: sortedMonths.map((month) => {
-      const receipt = receiptsByMonth.find((r) => r.forMonth === month)
+      const receipt = receiptsByMonth.get(month)
       const expense = expensesByMonth[month]
-      const cashIn = receipt?._sum.amount || 0
+      const cashIn = receipt?.amount || 0
       const cashOut = expense?.amount || 0
       return {
         month,
         cashIn,
         cashOut,
         net: cashIn - cashOut,
-        receiptCount: receipt?._count || 0,
+        receiptCount: receipt?.count || 0,
         paymentCount: expense?.count || 0,
       }
     }),
@@ -169,35 +209,41 @@ export async function getOverallSummary(from?: string, to?: string, fundId?: str
 }
 
 export async function getTransactionTimeline(from?: string, to?: string, fundId?: string) {
-  const dateFilter = buildDateFilter(from, to)
-  const receiptWhere = { ...dateFilter, ...(fundId ? { fundId } : {}) }
-  const [receipts, payments] = await Promise.all([
-    db.receipt.findMany({
-      where: receiptWhere,
-      orderBy: { date: "desc" },
-      take: 50,
-      include: {
-        member: { select: { name: true } },
-        fund: { select: { name: true } },
-      },
-    }),
-    db.payment.findMany({
-      where: dateFilter,
-      orderBy: { date: "desc" },
-      take: 50,
-    }),
-  ])
+  // Fetch receipts with member and fund names
+  let receiptQuery = supabase
+    .from("Receipt")
+    .select("id, date, amount, forMonth, narration, member:Member(name), fund:Fund(name)")
+    .order("date", { ascending: false })
+    .limit(50)
+  if (fundId) receiptQuery = receiptQuery.eq("fundId", fundId)
+  if (from) receiptQuery = receiptQuery.gte("date", from)
+  if (to) receiptQuery = receiptQuery.lte("date", to + "T23:59:59.999Z")
+
+  let paymentQuery = supabase
+    .from("Payment")
+    .select("id, date, amount, purpose, paidTo, narration")
+    .order("date", { ascending: false })
+    .limit(50)
+  if (from) paymentQuery = paymentQuery.gte("date", from)
+  if (to) paymentQuery = paymentQuery.lte("date", to + "T23:59:59.999Z")
+
+  const [receiptResult, paymentResult] = await Promise.all([receiptQuery, paymentQuery])
+  if (receiptResult.error) throw receiptResult.error
+  if (paymentResult.error) throw paymentResult.error
+
+  const receipts = receiptResult.data ?? []
+  const payments = paymentResult.data ?? []
 
   const timeline = [
-    ...receipts.map((r) => ({
+    ...receipts.map((r: any) => ({
       id: r.id,
       type: "receipt" as const,
       date: r.date,
       amount: r.amount,
-      description: `${r.member.name} - ${r.fund.name}${r.forMonth ? ` (${r.forMonth})` : ""}`,
+      description: `${r.member?.name} - ${r.fund?.name}${r.forMonth ? ` (${r.forMonth})` : ""}`,
       narration: r.narration,
     })),
-    ...payments.map((p) => ({
+    ...payments.map((p: any) => ({
       id: p.id,
       type: "payment" as const,
       date: p.date,

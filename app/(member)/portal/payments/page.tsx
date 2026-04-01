@@ -31,7 +31,7 @@ export default async function MyPaymentsPage() {
             </p>
           ) : (
             <div className="divide-y">
-              {payments.map((receipt) => (
+              {payments.map((receipt: any) => (
                 <div
                   key={receipt.id}
                   className="flex items-center justify-between py-3 first:pt-0 last:pb-0"

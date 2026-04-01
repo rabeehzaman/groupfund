@@ -1,42 +1,56 @@
 "use server"
 
-import { db } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 import { requireAuth } from "@/lib/auth-utils"
 
 export async function getFundDashboard(fundId: string) {
   await requireAuth()
 
-  const fund = await db.fund.findUnique({
-    where: { id: fundId },
-    include: { _count: { select: { receipts: true } } },
-  })
+  // Fetch the fund
+  const { data: fund, error: fundError } = await supabase
+    .from("Fund")
+    .select("*")
+    .eq("id", fundId)
+    .single()
+  if (fundError) throw fundError
   if (!fund) return null
 
-  const [totalResult, uniqueContributors, recentReceipts] = await Promise.all([
-    db.receipt.aggregate({
-      where: { fundId },
-      _sum: { amount: true },
-    }),
-    db.receipt.groupBy({
-      by: ["memberId"],
-      where: { fundId },
-    }),
-    db.receipt.findMany({
-      where: { fundId },
-      orderBy: { date: "desc" },
-      take: 10,
-      include: {
-        member: { select: { name: true, branch: true } },
-      },
-    }),
+  // Fetch receipt stats and recent receipts in parallel
+  const [receiptAmountResult, receiptMemberResult, recentReceiptResult] = await Promise.all([
+    supabase.from("Receipt").select("amount").eq("fundId", fundId),
+    supabase.from("Receipt").select("memberId").eq("fundId", fundId),
+    supabase
+      .from("Receipt")
+      .select("*, member:Member(name, branch)")
+      .eq("fundId", fundId)
+      .order("date", { ascending: false })
+      .limit(10),
   ])
 
-  const collected = totalResult._sum.amount || 0
+  if (receiptAmountResult.error) throw receiptAmountResult.error
+  if (receiptMemberResult.error) throw receiptMemberResult.error
+  if (recentReceiptResult.error) throw recentReceiptResult.error
+
+  const receiptAmountRows = receiptAmountResult.data ?? []
+  const receiptMemberRows = receiptMemberResult.data ?? []
+  const recentReceipts = recentReceiptResult.data ?? []
+
+  const collected = receiptAmountRows.reduce((sum, r) => sum + r.amount, 0)
+  const receiptCount = receiptAmountRows.length
+
+  // Count unique contributors
+  const uniqueMemberIds = new Set(receiptMemberRows.map((r) => r.memberId))
+  const uniqueContributors = uniqueMemberIds.size
 
   if (fund.type === "FIXED") {
-    const activeMembers = await db.member.count({ where: { isActive: true } })
+    const { count: activeMembers, error: memberError } = await supabase
+      .from("Member")
+      .select("*", { count: "exact", head: true })
+      .eq("isActive", true)
+    if (memberError) throw memberError
+
     const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
-    const expected = activeMembers * yearlyAmount
+    const expected = (activeMembers ?? 0) * yearlyAmount
     const progress = expected > 0 ? (collected / expected) * 100 : 0
 
     return {
@@ -45,10 +59,10 @@ export async function getFundDashboard(fundId: string) {
       expected,
       progress: Math.min(progress, 100),
       type: "FIXED" as const,
-      activeMembers,
+      activeMembers: activeMembers ?? 0,
       yearlyAmount,
-      receiptCount: fund._count.receipts,
-      uniqueContributors: uniqueContributors.length,
+      receiptCount,
+      uniqueContributors,
       recentReceipts,
     }
   } else {
@@ -61,8 +75,8 @@ export async function getFundDashboard(fundId: string) {
       goal,
       progress: goal > 0 ? Math.min(progress, 100) : 0,
       type: "OPEN" as const,
-      receiptCount: fund._count.receipts,
-      uniqueContributors: uniqueContributors.length,
+      receiptCount,
+      uniqueContributors,
       recentReceipts,
     }
   }
