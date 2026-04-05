@@ -58,13 +58,13 @@ export function ExportButtons({
         {loading ? "Exporting..." : label}
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem onSelect={() => download("xlsx")}>
+        <DropdownMenuItem onClick={() => download("xlsx")}>
           Excel (.xlsx)
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => download("csv")}>
+        <DropdownMenuItem onClick={() => download("csv")}>
           CSV (.csv)
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => download("pdf")}>
+        <DropdownMenuItem onClick={() => download("pdf")}>
           PDF (.pdf)
         </DropdownMenuItem>
       </DropdownMenuContent>
