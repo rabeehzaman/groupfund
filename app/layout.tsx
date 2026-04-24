@@ -14,12 +14,12 @@ const fontMono = Geist_Mono({
 })
 
 export const metadata = {
-  title: "Group Fund",
-  description: "Group fund management system",
+  title: "CBJAA Malappuram",
+  description: "CBJAA Malappuram fund management",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Group Fund",
+    title: "CBJAA Malappuram",
   },
   icons: {
     icon: "/icon-192.png",

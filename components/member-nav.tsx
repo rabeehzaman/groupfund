@@ -1,8 +1,9 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Receipt, Upload, LogOut, Wallet, User } from "lucide-react"
+import { LayoutDashboard, Receipt, Upload, LogOut, User, MessageSquare, Coins } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { logoutAction } from "@/lib/actions/auth"
 
@@ -10,7 +11,9 @@ const navItems = [
   { title: "Dashboard", href: "/portal", icon: LayoutDashboard },
   { title: "Profile", href: "/portal/profile", icon: User },
   { title: "My Payments", href: "/portal/payments", icon: Receipt },
+  { title: "Chit Fund", href: "/portal/chit-fund", icon: Coins },
   { title: "Upload Proof", href: "/portal/upload", icon: Upload },
+  { title: "Messages", href: "/portal/messages", icon: MessageSquare },
 ]
 
 type User = {
@@ -25,10 +28,14 @@ export function MemberNav({ user }: { user: User }) {
     <header className="border-b bg-background">
       <div className="flex h-14 items-center gap-4 px-4 md:px-6">
         <Link href="/portal" className="flex items-center gap-2 font-semibold">
-          <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Wallet className="size-4" />
-          </div>
-          <span className="hidden sm:inline">Group Fund</span>
+          <Image
+            src="/logo.png"
+            alt="Logo"
+            width={28}
+            height={28}
+            className="size-7 rounded-md object-cover"
+          />
+          <span className="hidden sm:inline">CBJAA Malappuram</span>
         </Link>
 
         <nav className="flex items-center gap-1">

@@ -57,7 +57,7 @@ function getBreadcrumbs(pathname: string): Crumb[] {
     return [{ label: "Funds", href: "/funds" }, { label: "Edit Fund" }]
   if (pathname.match(/^\/funds\/[^/]+$/))
     return [{ label: "Funds", href: "/funds" }, { label: "Fund Details" }]
-  return [{ label: "Group Fund" }]
+  return [{ label: "CBJAA Malappuram" }]
 }
 
 export function SiteHeader({ user }: { user?: User }) {

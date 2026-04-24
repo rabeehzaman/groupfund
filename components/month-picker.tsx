@@ -8,6 +8,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { MONTH_SHORT } from "@/lib/constants"
 
@@ -15,10 +22,14 @@ export function MonthPicker({
   name,
   defaultValue,
   placeholder = "Pick a month",
+  fromYear,
+  toYear,
 }: {
   name: string
   defaultValue?: string // "YYYY-MM"
   placeholder?: string
+  fromYear?: number
+  toYear?: number
 }) {
   const now = new Date()
   const initial = defaultValue
@@ -30,6 +41,11 @@ export function MonthPicker({
   )
   const [viewYear, setViewYear] = useState(initial.year)
   const [open, setOpen] = useState(false)
+
+  const currentYear = now.getFullYear()
+  const start = fromYear ?? 2015
+  const end = toYear ?? currentYear + 2
+  const years = Array.from({ length: end - start + 1 }, (_, i) => end - i)
 
   const value = selected
     ? `${selected.year}-${String(selected.month).padStart(2, "0")}`
@@ -58,19 +74,35 @@ export function MonthPicker({
           {displayLabel || placeholder}
         </PopoverTrigger>
         <PopoverContent className="w-64 p-3" align="start">
-          <div className="flex items-center justify-between pb-3">
+          <div className="flex items-center justify-between gap-1 pb-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setViewYear((y) => y - 1)}
+              aria-label="Previous year"
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <span className="text-sm font-semibold">{viewYear}</span>
+            <Select
+              value={String(viewYear)}
+              onValueChange={(v) => v && setViewYear(Number(v))}
+            >
+              <SelectTrigger className="h-8 flex-1 font-semibold">
+                <SelectValue>{viewYear}</SelectValue>
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {years.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setViewYear((y) => y + 1)}
+              aria-label="Next year"
             >
               <ChevronRight className="size-4" />
             </Button>

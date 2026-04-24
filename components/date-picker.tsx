@@ -16,21 +16,31 @@ export function DatePicker({
   name,
   defaultValue,
   placeholder = "Pick a date",
+  fromYear,
+  toYear,
 }: {
   name: string
   defaultValue?: Date
   placeholder?: string
+  fromYear?: number
+  toYear?: number
 }) {
   const [date, setDate] = useState<Date | undefined>(defaultValue)
   const [open, setOpen] = useState(false)
 
+  const currentYear = new Date().getFullYear()
+  const start = fromYear ?? 1940
+  const end = toYear ?? currentYear + 5
+
+  // Emit YYYY-MM-DD in local time so server and DB never shift the day
+  // across timezones (e.g. IST users losing a day on toISOString()).
+  const value = date
+    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+    : ""
+
   return (
     <>
-      <input
-        type="hidden"
-        name={name}
-        value={date ? date.toISOString() : ""}
-      />
+      <input type="hidden" name={name} value={value} />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           render={
@@ -54,7 +64,10 @@ export function DatePicker({
               setDate(d)
               setOpen(false)
             }}
-            defaultMonth={date}
+            defaultMonth={date ?? new Date()}
+            captionLayout="dropdown"
+            startMonth={new Date(start, 0)}
+            endMonth={new Date(end, 11)}
           />
         </PopoverContent>
       </Popover>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
@@ -28,15 +29,52 @@ type Fund = {
   purpose: string
   isRecurring: boolean
   isDefault: boolean
+  isChitFund: boolean
+  appliesToAllMembers: boolean
+  memberIds?: string[]
   startDate: Date | null
 }
 
-export function FundForm({ fund }: { fund?: Fund }) {
+type MemberOption = { id: string; name: string; branch: string }
+
+export function FundForm({
+  fund,
+  members,
+}: {
+  fund?: Fund
+  members: MemberOption[]
+}) {
   const action = fund ? updateFund.bind(null, fund.id) : createFund
 
   const [state, formAction, isPending] = useActionState(action, null)
   const [type, setType] = useState<"FIXED" | "OPEN">(fund?.type ?? "FIXED")
   const [isRecurring, setIsRecurring] = useState(fund?.isRecurring ?? true)
+  const [isChitFund, setIsChitFund] = useState(fund?.isChitFund ?? false)
+  const [appliesToAll, setAppliesToAll] = useState(
+    fund?.appliesToAllMembers ?? true,
+  )
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
+    new Set(fund?.memberIds ?? []),
+  )
+  const [memberFilter, setMemberFilter] = useState("")
+
+  const filteredMembers = members.filter((m) => {
+    if (!memberFilter) return true
+    const q = memberFilter.toLowerCase()
+    return (
+      m.name.toLowerCase().includes(q) ||
+      (m.branch && m.branch.toLowerCase().includes(q))
+    )
+  })
+
+  function toggleMember(id: string) {
+    setSelectedMembers((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   return (
     <Card className="max-w-lg">
@@ -199,6 +237,122 @@ export function FundForm({ fund }: { fund?: Fund }) {
               placeholder="Optional description of this fund"
               rows={2}
             />
+          </div>
+
+          <div className="flex items-start gap-3 rounded-md border p-3">
+            <input type="hidden" name="isChitFund" value={String(isChitFund)} />
+            <Checkbox
+              id="isChitFund"
+              checked={isChitFund}
+              onCheckedChange={(checked) => setIsChitFund(!!checked)}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="isChitFund" className="cursor-pointer">
+                This is the Chit Fund
+              </Label>
+              <p className="text-muted-foreground text-xs">
+                Contributions to this fund appear on the Chit Fund dashboard.
+                Only one fund can be marked as the chit fund.
+              </p>
+              {state?.error?.isChitFund && (
+                <p className="text-destructive text-sm">
+                  {state.error.isChitFund[0]}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-md border p-3">
+            <div className="flex items-start gap-3">
+              <input
+                type="hidden"
+                name="appliesToAllMembers"
+                value={String(appliesToAll)}
+              />
+              <Checkbox
+                id="appliesToAllMembers"
+                checked={appliesToAll}
+                onCheckedChange={(checked) => setAppliesToAll(!!checked)}
+                disabled={fund?.isDefault}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="appliesToAllMembers" className="cursor-pointer">
+                  Applies to all members
+                </Label>
+                <p className="text-muted-foreground text-xs">
+                  Uncheck to limit this fund to specific members only
+                  (e.g. an admission fund charged only to new admissions).
+                </p>
+                {fund?.isDefault && (
+                  <p className="text-muted-foreground text-xs">
+                    The default fund always applies to all members.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {!appliesToAll && !fund?.isDefault && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">
+                    Selected members ({selectedMembers.size})
+                  </Label>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() =>
+                      setSelectedMembers(
+                        selectedMembers.size === members.length
+                          ? new Set()
+                          : new Set(members.map((m) => m.id)),
+                      )
+                    }
+                  >
+                    {selectedMembers.size === members.length
+                      ? "Clear all"
+                      : "Select all"}
+                  </button>
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Search members..."
+                  value={memberFilter}
+                  onChange={(e) => setMemberFilter(e.target.value)}
+                  className="h-8"
+                />
+                <div className="max-h-60 space-y-1 overflow-y-auto rounded-md border p-2">
+                  {Array.from(selectedMembers).map((id) => (
+                    <input key={id} type="hidden" name="memberIds" value={id} />
+                  ))}
+                  {filteredMembers.length === 0 ? (
+                    <p className="py-4 text-center text-xs text-muted-foreground">
+                      No members match.
+                    </p>
+                  ) : (
+                    filteredMembers.map((m) => (
+                      <label
+                        key={m.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 hover:bg-accent"
+                      >
+                        <Checkbox
+                          checked={selectedMembers.has(m.id)}
+                          onCheckedChange={() => toggleMember(m.id)}
+                        />
+                        <span className="text-sm">
+                          {m.name}
+                          {m.branch && (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · {m.branch}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <Button type="submit" disabled={isPending}>

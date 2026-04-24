@@ -1,4 +1,4 @@
-import { Wallet } from "lucide-react"
+import Image from "next/image"
 import {
   Card,
   CardContent,
@@ -12,11 +12,16 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Wallet className="size-6" />
-        </div>
-        <CardTitle className="text-xl">Group Fund</CardTitle>
-        <CardDescription>Sign in to manage your group fund.</CardDescription>
+        <Image
+          src="/logo.png"
+          alt="Canara Bank Jewel Appraisers Association Malappuram"
+          width={80}
+          height={80}
+          priority
+          className="mx-auto mb-2 size-20 rounded-full object-cover"
+        />
+        <CardTitle className="text-xl">CBJAA Malappuram</CardTitle>
+        <CardDescription>Sign in to manage the association fund.</CardDescription>
       </CardHeader>
       <CardContent>
         <LoginForm />

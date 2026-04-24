@@ -103,25 +103,49 @@ export async function getRecentActivity(from?: string, to?: string) {
 }
 
 export async function getCollectionRate() {
-  const [memberResult, fundResult] = await Promise.all([
-    supabase.from("Member").select("*", { count: "exact", head: true }).eq("isActive", true),
-    supabase.from("Fund").select("*").eq("isDefault", true).limit(1).single(),
-  ])
-  if (memberResult.error) throw memberResult.error
-  const totalActive = memberResult.count ?? 0
-
-  const defaultFund = fundResult.data
+  const { data: defaultFund, error: fundError } = await supabase
+    .from("Fund")
+    .select("*")
+    .eq("isDefault", true)
+    .limit(1)
+    .single()
+  if (fundError) throw fundError
   if (!defaultFund) {
-    return { paidCount: 0, totalActive, rate: 0 }
+    return { paidCount: 0, totalActive: 0, rate: 0 }
   }
 
-  const yearlyAmount = defaultFund.yearlyAmount ?? (defaultFund.amount ? defaultFund.amount * 12 : 0)
+  let eligibleIds: string[] | null = null
+  if (defaultFund.appliesToAllMembers === false) {
+    const { data: mfRows, error: mfError } = await supabase
+      .from("MemberFund")
+      .select("memberId, Member!inner(isActive)")
+      .eq("fundId", defaultFund.id)
+    if (mfError) throw mfError
+    eligibleIds = (mfRows ?? [])
+      .filter((r: any) => r.Member?.isActive)
+      .map((r: any) => r.memberId)
+  }
+
+  let totalActive = 0
+  if (eligibleIds) {
+    totalActive = eligibleIds.length
+  } else {
+    const { count, error: countError } = await supabase
+      .from("Member")
+      .select("*", { count: "exact", head: true })
+      .eq("isActive", true)
+    if (countError) throw countError
+    totalActive = count ?? 0
+  }
+
+  const yearlyAmount =
+    defaultFund.yearlyAmount ??
+    (defaultFund.amount ? defaultFund.amount * 12 : 0)
 
   if (yearlyAmount <= 0) {
     return { paidCount: 0, totalActive, rate: 0 }
   }
 
-  // Fetch receipt totals grouped by memberId
   const { data: rows, error } = await supabase
     .from("Receipt")
     .select("memberId, amount")
@@ -130,6 +154,7 @@ export async function getCollectionRate() {
 
   const totals = new Map<string, number>()
   for (const r of rows ?? []) {
+    if (eligibleIds && !eligibleIds.includes(r.memberId)) continue
     totals.set(r.memberId, (totals.get(r.memberId) ?? 0) + r.amount)
   }
 

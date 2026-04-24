@@ -2,6 +2,7 @@
 
 import { supabase } from "@/lib/supabase"
 import { requireAuth } from "@/lib/auth-utils"
+import { getMembersForFund } from "@/lib/actions/funds"
 
 export type Defaulter = {
   id: string
@@ -45,22 +46,20 @@ export async function getDefaulters(fundId?: string): Promise<Defaulter[]> {
   const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
   if (yearlyAmount <= 0) return []
 
-  // Fetch members and receipt totals in parallel
-  const [membersResult, receiptResult] = await Promise.all([
-    supabase
-      .from("Member")
-      .select("id, name, branch, joinDate")
-      .eq("isActive", true),
+  // Fetch members subject to this fund + receipt totals
+  const [members, receiptResult] = await Promise.all([
+    getMembersForFund<{ id: string; name: string; branch: string; joinDate: string }>(
+      fund,
+      "id, name, branch, joinDate",
+    ),
     supabase
       .from("Receipt")
       .select("memberId, amount")
       .eq("fundId", fund.id),
   ])
 
-  if (membersResult.error) throw membersResult.error
   if (receiptResult.error) throw receiptResult.error
 
-  const members = membersResult.data ?? []
   const receiptRows = receiptResult.data ?? []
 
   // Group receipts by memberId
@@ -117,6 +116,17 @@ export async function getDefaulterStatus(memberId: string, fundId?: string) {
 
   const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
   if (yearlyAmount <= 0) return null
+
+  // If fund only applies to select members, skip members not in the list
+  if (fund.appliesToAllMembers === false) {
+    const { count, error: mfError } = await supabase
+      .from("MemberFund")
+      .select("*", { count: "exact", head: true })
+      .eq("fundId", fund.id)
+      .eq("memberId", memberId)
+    if (mfError) throw mfError
+    if (!count) return null
+  }
 
   // Fetch member
   const { data: member, error: memberError } = await supabase

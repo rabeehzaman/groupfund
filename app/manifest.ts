@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Group Fund",
-    short_name: "Group Fund",
-    description: "Group fund management system",
+    name: "CBJAA Malappuram",
+    short_name: "CBJAA",
+    description: "CBJAA Malappuram fund management",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

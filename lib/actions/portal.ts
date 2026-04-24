@@ -45,6 +45,37 @@ export async function getMyDashboard() {
   return { member: memberWithReceipts, totalPaid, paymentsCount }
 }
 
+export async function getMyFunds() {
+  const memberId = await getMyMemberId()
+
+  const { data: funds, error } = await supabase
+    .from('Fund')
+    .select('*')
+    .eq('isActive', true)
+    .order('isDefault', { ascending: false })
+    .order('name')
+  if (error) throw error
+
+  const optInIds = (funds ?? [])
+    .filter((f: any) => f.appliesToAllMembers === false)
+    .map((f: any) => f.id)
+
+  let memberOptIns: Set<string> = new Set()
+  if (optInIds.length > 0) {
+    const { data: mfRows, error: mfError } = await supabase
+      .from('MemberFund')
+      .select('fundId')
+      .eq('memberId', memberId)
+      .in('fundId', optInIds)
+    if (mfError) throw mfError
+    memberOptIns = new Set((mfRows ?? []).map((r: any) => r.fundId))
+  }
+
+  return (funds ?? []).filter(
+    (f: any) => f.appliesToAllMembers !== false || memberOptIns.has(f.id),
+  )
+}
+
 export async function getMyProfile() {
   const memberId = await getMyMemberId()
 

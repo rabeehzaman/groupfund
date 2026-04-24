@@ -2,15 +2,14 @@ import { IndianRupee, CalendarCheck, Activity } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getMyDashboard } from "@/lib/actions/portal"
-import { getActiveFunds } from "@/lib/actions/funds"
+import { getMyDashboard, getMyFunds } from "@/lib/actions/portal"
 import { formatCurrency, formatMonthYear, formatDate } from "@/lib/format"
 import { PaymentGrid } from "@/components/payment-grid"
 
 export default async function MemberPortalPage() {
   const [{ member, totalPaid, paymentsCount }, funds] = await Promise.all([
     getMyDashboard(),
-    getActiveFunds(),
+    getMyFunds(),
   ])
 
   // Group receipts by fund

@@ -13,6 +13,9 @@ export const fundSchema = z
     description: z.string().max(500).default(""),
     purpose: z.string().max(500).default(""),
     isRecurring: z.coerce.boolean().default(true),
+    isChitFund: z.coerce.boolean().default(false),
+    appliesToAllMembers: z.coerce.boolean().default(true),
+    memberIds: z.array(z.string()).default([]),
     startDate: z.coerce.date().optional(),
   })
   .refine(

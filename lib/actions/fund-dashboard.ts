@@ -43,14 +43,27 @@ export async function getFundDashboard(fundId: string) {
   const uniqueContributors = uniqueMemberIds.size
 
   if (fund.type === "FIXED") {
-    const { count: activeMembers, error: memberError } = await supabase
-      .from("Member")
-      .select("*", { count: "exact", head: true })
-      .eq("isActive", true)
-    if (memberError) throw memberError
+    let activeMembers = 0
+    if (fund.appliesToAllMembers === false) {
+      const { data: mfRows, error: mfError } = await supabase
+        .from("MemberFund")
+        .select("memberId, Member!inner(isActive)")
+        .eq("fundId", fundId)
+      if (mfError) throw mfError
+      activeMembers = (mfRows ?? []).filter(
+        (r: any) => r.Member?.isActive,
+      ).length
+    } else {
+      const { count, error: memberError } = await supabase
+        .from("Member")
+        .select("*", { count: "exact", head: true })
+        .eq("isActive", true)
+      if (memberError) throw memberError
+      activeMembers = count ?? 0
+    }
 
     const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
-    const expected = (activeMembers ?? 0) * yearlyAmount
+    const expected = activeMembers * yearlyAmount
     const progress = expected > 0 ? (collected / expected) * 100 : 0
 
     return {
@@ -59,7 +72,7 @@ export async function getFundDashboard(fundId: string) {
       expected,
       progress: Math.min(progress, 100),
       type: "FIXED" as const,
-      activeMembers: activeMembers ?? 0,
+      activeMembers,
       yearlyAmount,
       receiptCount,
       uniqueContributors,

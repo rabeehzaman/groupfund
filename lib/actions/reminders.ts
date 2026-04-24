@@ -3,6 +3,7 @@
 import { supabase } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/format"
 import { requireAdmin } from "@/lib/auth-utils"
+import { getMembersForFund } from "@/lib/actions/funds"
 
 export async function getPendingMembers(fundId?: string) {
   await requireAdmin()
@@ -26,23 +27,17 @@ export async function getPendingMembers(fundId?: string) {
 
   const yearlyAmount = fund.yearlyAmount ?? (fund.amount ? fund.amount * 12 : 0)
 
-  // Fetch members and receipt totals in parallel
-  const [membersResult, receiptResult] = await Promise.all([
-    supabase
-      .from("Member")
-      .select("id, name, branch")
-      .eq("isActive", true)
-      .order("name", { ascending: true }),
+  // Fetch members subject to this fund + receipt totals
+  const [members, receiptResult] = await Promise.all([
+    getMembersForFund<{ id: string; name: string; branch: string }>(fund),
     supabase
       .from("Receipt")
       .select("memberId, amount")
       .eq("fundId", fund.id),
   ])
 
-  if (membersResult.error) throw membersResult.error
   if (receiptResult.error) throw receiptResult.error
 
-  const members = membersResult.data ?? []
   const receiptRows = receiptResult.data ?? []
 
   // Group receipts by memberId

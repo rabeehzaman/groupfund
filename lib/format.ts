@@ -15,6 +15,16 @@ export function formatDate(date: Date | string): string {
   }).format(new Date(date))
 }
 
+export function formatDateTime(date: Date | string): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(date))
+}
+
 export function formatMonthYear(forMonth: string): string {
   const [year, month] = forMonth.split("-")
   const date = new Date(Number(year), Number(month) - 1)

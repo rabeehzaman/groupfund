@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Suspense } from "react"
-import { Plus, Receipt, CreditCard, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { Plus, Receipt, CreditCard, ArrowUpRight, ArrowDownRight, Coins, Users, IndianRupee } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SectionCards } from "@/components/section-cards"
@@ -12,6 +12,7 @@ import {
   getRecentActivity,
   getCollectionRate,
 } from "@/lib/actions/dashboard"
+import { getChitFundSummary } from "@/lib/actions/chit-fund"
 import { CollectionRateCard } from "@/components/collection-rate-card"
 import { formatCurrency, formatDate } from "@/lib/format"
 
@@ -21,11 +22,12 @@ export default async function DashboardPage({
   searchParams: Promise<{ from?: string; to?: string }>
 }) {
   const { from, to } = await searchParams
-  const [stats, trend, activity, collectionRate] = await Promise.all([
+  const [stats, trend, activity, collectionRate, chitSummary] = await Promise.all([
     getDashboardStats(from, to),
     getCollectionTrend(from, to),
     getRecentActivity(from, to),
     getCollectionRate(),
+    getChitFundSummary(),
   ])
 
   return (
@@ -58,6 +60,52 @@ export default async function DashboardPage({
       </Suspense>
 
       <SectionCards stats={stats} />
+
+      {chitSummary.fund && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950">
+                <Coins className="size-4 text-amber-600" />
+              </div>
+              <CardTitle className="text-base">
+                Chit Fund · {chitSummary.fund.name}
+              </CardTitle>
+            </div>
+            <Button variant="outline" size="sm" render={<Link href="/chit-fund" />}>
+              View details
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-muted-foreground flex items-center gap-1 text-xs">
+                  <IndianRupee className="size-3" /> Total
+                </p>
+                <p className="mt-1 text-2xl font-bold text-amber-600">
+                  {formatCurrency(chitSummary.totalCollected)}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground flex items-center gap-1 text-xs">
+                  <Users className="size-3" /> Contributors
+                </p>
+                <p className="mt-1 text-2xl font-bold">
+                  {chitSummary.contributorCount}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground flex items-center gap-1 text-xs">
+                  <Receipt className="size-3" /> Entries
+                </p>
+                <p className="mt-1 text-2xl font-bold">
+                  {chitSummary.receiptCount}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <CollectionRateCard data={collectionRate} />
 

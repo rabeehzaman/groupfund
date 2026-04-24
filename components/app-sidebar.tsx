@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -9,10 +10,11 @@ import {
   CreditCard,
   BarChart3,
   Settings,
-  Wallet,
   Layers,
   AlertTriangle,
   Bell,
+  MessageSquare,
+  Coins,
   LogOut,
 } from "lucide-react"
 import { logoutAction } from "@/lib/actions/auth"
@@ -41,11 +43,13 @@ const mainNav = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Members", href: "/members", icon: Users },
   { title: "Funds", href: "/funds", icon: Layers },
+  { title: "Chit Fund", href: "/chit-fund", icon: Coins },
   { title: "Receipts", href: "/receipts", icon: Receipt },
   { title: "Payments", href: "/payments", icon: CreditCard },
   { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "Defaulters", href: "/defaulters", icon: AlertTriangle },
   { title: "Reminders", href: "/reminders", icon: Bell },
+  { title: "Messages", href: "/messages", icon: MessageSquare },
 ]
 
 const secondaryNav = [
@@ -61,11 +65,15 @@ export function AppSidebar({ user }: { user: User }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
-                <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Wallet className="size-4" />
-                </div>
+                <Image
+                  src="/logo.png"
+                  alt="Logo"
+                  width={32}
+                  height={32}
+                  className="aspect-square size-8 rounded-lg object-cover"
+                />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Group Fund</span>
+                  <span className="truncate font-semibold">CBJAA Malappuram</span>
                   <span className="text-muted-foreground truncate text-xs">
                     Fund Management
                   </span>

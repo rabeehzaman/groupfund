@@ -37,7 +37,7 @@ export async function getActiveFunds() {
 export async function getFund(id: string) {
   const { data, error } = await supabase
     .from('Fund')
-    .select('*, Receipt(count)')
+    .select('*, Receipt(count), MemberFund(memberId)')
     .eq('id', id)
     .maybeSingle()
 
@@ -45,8 +45,41 @@ export async function getFund(id: string) {
   if (!data) return null
 
   const _count = { receipts: data.Receipt?.[0]?.count ?? 0 }
-  const { Receipt, ...rest } = data
-  return { ...rest, _count }
+  const memberIds = (data.MemberFund ?? []).map((mf: any) => mf.memberId)
+  const { Receipt, MemberFund, ...rest } = data
+  return { ...rest, _count, memberIds }
+}
+
+export async function getFundMemberIds(fundId: string) {
+  const { data, error } = await supabase
+    .from('MemberFund')
+    .select('memberId')
+    .eq('fundId', fundId)
+  if (error) throw error
+  return (data ?? []).map((mf: any) => mf.memberId)
+}
+
+type MinimalMember = { id: string; name: string; branch: string; joinDate?: string }
+
+export async function getMembersForFund<T extends MinimalMember>(
+  fund: { id: string; appliesToAllMembers?: boolean },
+  columns = "id, name, branch",
+): Promise<T[]> {
+  let query = supabase
+    .from("Member")
+    .select(columns)
+    .eq("isActive", true)
+    .order("name")
+
+  if (fund.appliesToAllMembers === false) {
+    const ids = await getFundMemberIds(fund.id)
+    if (ids.length === 0) return []
+    query = query.in("id", ids)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []) as unknown as T[]
 }
 
 export async function getDefaultFund() {
@@ -66,12 +99,17 @@ export async function createFund(
   formData: FormData
 ) {
   await requireAdmin()
+  const memberIdsRaw = formData.getAll("memberIds").map(String).filter(Boolean)
+
   const raw: Record<string, unknown> = {
     name: formData.get("name"),
     type: formData.get("type"),
     description: formData.get("description"),
     purpose: formData.get("purpose"),
     isRecurring: formData.get("isRecurring") === "true",
+    isChitFund: formData.get("isChitFund") === "true",
+    appliesToAllMembers: formData.get("appliesToAllMembers") !== "false",
+    memberIds: memberIdsRaw,
   }
 
   const amount = formData.get("amount")
@@ -93,6 +131,23 @@ export async function createFund(
     return { error: parsed.error.flatten().fieldErrors }
   }
 
+  if (parsed.data.isChitFund) {
+    const { data: existingChit, error: chitCheckError } = await supabase
+      .from("Fund")
+      .select("id")
+      .eq("isChitFund", true)
+      .maybeSingle()
+    if (chitCheckError) throw chitCheckError
+    if (existingChit) {
+      return {
+        error: {
+          isChitFund: ["Another fund is already marked as the chit fund."],
+        },
+      }
+    }
+  }
+
+  const fundId = generateId()
   const data: {
     id: string
     name: string
@@ -103,11 +158,13 @@ export async function createFund(
     description: string
     purpose: string
     isRecurring: boolean
+    isChitFund: boolean
+    appliesToAllMembers: boolean
     startDate: string | null
     createdAt: string
     updatedAt: string
   } = {
-    id: generateId(),
+    id: fundId,
     name: parsed.data.name,
     type: parsed.data.type,
     amount: parsed.data.type === "FIXED" ? (parsed.data.amount ?? null) : null,
@@ -117,6 +174,8 @@ export async function createFund(
     description: parsed.data.description ?? "",
     purpose: parsed.data.purpose ?? "",
     isRecurring: parsed.data.isRecurring ?? true,
+    isChitFund: parsed.data.isChitFund ?? false,
+    appliesToAllMembers: parsed.data.appliesToAllMembers ?? true,
     startDate: parsed.data.startDate ? new Date(parsed.data.startDate).toISOString() : null,
     createdAt: now(),
     updatedAt: now(),
@@ -125,7 +184,20 @@ export async function createFund(
   const { error } = await supabase.from('Fund').insert(data)
   if (error) throw error
 
+  if (!data.appliesToAllMembers && parsed.data.memberIds.length > 0) {
+    const timestamp = now()
+    const rows = parsed.data.memberIds.map((memberId) => ({
+      fundId,
+      memberId,
+      createdAt: timestamp,
+    }))
+    const { error: mfError } = await supabase.from('MemberFund').insert(rows)
+    if (mfError) throw mfError
+  }
+
   revalidatePath("/funds")
+  revalidatePath("/chit-fund")
+  revalidatePath("/dashboard")
   redirect("/funds")
 }
 
@@ -144,12 +216,17 @@ export async function updateFund(
   if (existingError) throw existingError
   if (!existing) return { error: { name: ["Fund not found"] } }
 
+  const memberIdsRaw = formData.getAll("memberIds").map(String).filter(Boolean)
+
   const raw: Record<string, unknown> = {
     name: formData.get("name"),
     type: existing.isDefault ? existing.type : formData.get("type"),
     description: formData.get("description"),
     purpose: formData.get("purpose"),
     isRecurring: formData.get("isRecurring") === "true",
+    isChitFund: formData.get("isChitFund") === "true",
+    appliesToAllMembers: formData.get("appliesToAllMembers") !== "false",
+    memberIds: memberIdsRaw,
   }
 
   const amount = formData.get("amount")
@@ -171,6 +248,23 @@ export async function updateFund(
     return { error: parsed.error.flatten().fieldErrors }
   }
 
+  if (parsed.data.isChitFund) {
+    const { data: existingChit, error: chitCheckError } = await supabase
+      .from("Fund")
+      .select("id")
+      .eq("isChitFund", true)
+      .neq("id", id)
+      .maybeSingle()
+    if (chitCheckError) throw chitCheckError
+    if (existingChit) {
+      return {
+        error: {
+          isChitFund: ["Another fund is already marked as the chit fund."],
+        },
+      }
+    }
+  }
+
   const data: {
     name: string
     type: "FIXED" | "OPEN"
@@ -180,6 +274,8 @@ export async function updateFund(
     description: string
     purpose: string
     isRecurring: boolean
+    isChitFund: boolean
+    appliesToAllMembers: boolean
     startDate: string | null
     updatedAt: string
   } = {
@@ -192,6 +288,8 @@ export async function updateFund(
     description: parsed.data.description ?? "",
     purpose: parsed.data.purpose ?? "",
     isRecurring: parsed.data.isRecurring ?? true,
+    isChitFund: parsed.data.isChitFund ?? false,
+    appliesToAllMembers: parsed.data.appliesToAllMembers ?? true,
     startDate: parsed.data.startDate ? new Date(parsed.data.startDate).toISOString() : null,
     updatedAt: now(),
   }
@@ -199,16 +297,35 @@ export async function updateFund(
   const { error } = await supabase.from('Fund').update(data).eq('id', id)
   if (error) throw error
 
+  const { error: clearError } = await supabase
+    .from('MemberFund')
+    .delete()
+    .eq('fundId', id)
+  if (clearError) throw clearError
+
+  if (!data.appliesToAllMembers && parsed.data.memberIds.length > 0) {
+    const timestamp = now()
+    const rows = parsed.data.memberIds.map((memberId) => ({
+      fundId: id,
+      memberId,
+      createdAt: timestamp,
+    }))
+    const { error: mfError } = await supabase.from('MemberFund').insert(rows)
+    if (mfError) throw mfError
+  }
+
   revalidatePath("/funds")
+  revalidatePath("/chit-fund")
+  revalidatePath("/dashboard")
   redirect("/funds")
 }
 
-export async function deleteFund(id: string) {
+export async function deleteFund(id: string, options?: { force?: boolean }) {
   await requireAdmin()
 
   const { data: fund, error: fundError } = await supabase
     .from('Fund')
-    .select('*, Receipt(count)')
+    .select('id, isDefault, name')
     .eq('id', id)
     .maybeSingle()
 
@@ -216,13 +333,34 @@ export async function deleteFund(id: string) {
   if (!fund) return { error: "Fund not found" }
   if (fund.isDefault) return { error: "Cannot delete the default fund" }
 
-  const receiptCount = fund.Receipt?.[0]?.count ?? 0
-  if (receiptCount > 0)
-    return { error: "Cannot delete a fund that has receipts" }
+  const { count: receiptCount, error: countError } = await supabase
+    .from('Receipt')
+    .select('*', { count: 'exact', head: true })
+    .eq('fundId', id)
+
+  if (countError) throw countError
+
+  if ((receiptCount ?? 0) > 0) {
+    if (!options?.force) {
+      return {
+        error: `This fund has ${receiptCount} receipt(s). Confirm to delete the fund and all its receipts.`,
+        receiptCount: receiptCount ?? 0,
+      }
+    }
+
+    const { error: delReceiptsError } = await supabase
+      .from('Receipt')
+      .delete()
+      .eq('fundId', id)
+    if (delReceiptsError) throw delReceiptsError
+  }
 
   const { error } = await supabase.from('Fund').delete().eq('id', id)
   if (error) throw error
 
   revalidatePath("/funds")
+  revalidatePath("/receipts")
+  revalidatePath("/dashboard")
+  revalidatePath("/chit-fund")
   return { success: true }
 }

@@ -25,9 +25,17 @@ export interface Fund {
   isRecurring: boolean
   isActive: boolean
   isDefault: boolean
+  isChitFund: boolean
+  appliesToAllMembers: boolean
   startDate: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface MemberFund {
+  memberId: string
+  fundId: string
+  createdAt: string
 }
 
 export interface Member {
@@ -88,4 +96,11 @@ export interface Settings {
   defaultYearlyAmount: number
   financialYearStart: number
   updatedAt: string
+}
+
+export interface MemberMessage {
+  id: string
+  memberId: string
+  content: string
+  createdAt: string
 }
